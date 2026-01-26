@@ -1,12 +1,16 @@
 from pathlib import Path
 import tempfile
 import shutil
+import sys
+import os
+
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from src.document_processor.pdf_loader import PDFLoader, DocumentProcessor
 
 
 def test_pdf_loader():
-    test_pdf_dir = Path("../src/data/test_doc")
+    test_pdf_dir = Path("src/data/test_doc")
     pdf_files = list(test_pdf_dir.glob("*.pdf"))
 
     assert pdf_files, "No test PDF files found"
@@ -34,7 +38,7 @@ def test_document_processor():
         tmp_path = Path(tmpdir)
 
         # copy test PDFs into temp dir
-        source_dir = Path("../src/data/test_doc")
+        source_dir = Path("src/data/test_doc")
         pdf_files = list(source_dir.glob("*.pdf"))
         assert pdf_files, "No test PDFs to copy"
 
