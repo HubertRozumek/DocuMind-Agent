@@ -43,34 +43,24 @@ class ChromaDBVectorStore:
         Initialize the client to connect to ChromaDB
         """
         try:
-            settings = Settings(
-                chroma_db_impl="duckdb+parquet",
-                persist_directory=self.persist_directory,
-                anonymized_telemetry=False
+
+            self.client = chromadb.PersistentClient(path=self.persist_directory)
+
+            if self.reset_on_start:
+                try:
+                    self.client.delete_collection(self.collection_name)
+                    logger.info(f"Deleted {self.collection_name} collection")
+                except Exception:
+                    pass
+
+            self.collection = self.client.get_or_create_collection(
+                name=self.collection_name,
+                embedding_function=self.embedding_function,
+                metadata={
+                    "hnsw:space": "cosine",
+                    "created": datetime.now().isoformat()
+                }
             )
-            self.client = chromadb.Client(settings)
-
-            existing_collection = [c.name for c in self.client.list_collections()]
-
-            if self.reset_on_start and self.collection_name not in existing_collection:
-                logger.info(f"Resetting {self.collection_name} collection")
-                self.client.delete_collection(self.collection_name)
-                existing_collection.remove(self.collection_name)
-
-            if self.collection_name in existing_collection:
-                self.collection = self.client.get_collection(
-                    name = self.collection_name,
-                    embedding_function = self.embedding_function
-                )
-                logger.info(f"Loaded {self.collection_name} collection")
-            else:
-                self.collection = self.client.create_collection(
-                    name = self.collection_name,
-                    embedding_function = self.embedding_function,
-                    metadata = {"created": datetime.now().isoformat()}
-                )
-                logger.info(f"Created {self.collection_name} collection")
-
             self._log_collection_stats()
 
         except Exception as e:
@@ -92,7 +82,6 @@ class ChromaDBVectorStore:
 
     def add_documents(self,
                       documents: List[Dict[str, Any]],
-                      embeddings: Optional[np.ndarray] = None,
                       batch_size: int = 100) -> int:
         """
         Add documents to vector store
@@ -138,20 +127,11 @@ class ChromaDBVectorStore:
             batch_metadatas = metadatas[i:i+batch_size]
 
             try:
-                if embeddings is not None:
-                    batch_embeddings = embeddings[i:i+batch_size]
-                    self.collection.add(
-                        ids = batch_ids,
-                        embeddings = batch_embeddings.tolist() if isinstance(batch_embeddings, np.ndarray) else batch_embeddings,
-                        metadatas = batch_metadatas,
-                        documents = batch_texts,
-                    )
-                else:
-                    self.collection.add(
-                        ids = batch_ids,
-                        metadatas = batch_metadatas,
-                        documents = batch_texts,
-                    )
+                self.collection.add(
+                    ids = batch_ids,
+                    metadatas = batch_metadatas,
+                    documents = batch_texts
+                )
 
                 total_added += len(batch_ids)
                 logger.info(f"Added {i//batch_size + 1}: {len(batch_ids)} documents")
@@ -161,21 +141,13 @@ class ChromaDBVectorStore:
 
                 for j in range(len(batch_ids)):
                     try:
-                        if embeddings is not None:
-                            self.collection.add(
-                                ids = [batch_ids[j]],
-                                embeddings = [embeddings[i+j].tolist()],
-                                metadatas = [batch_metadatas[j]],
-                                documents = [batch_texts[j]],
-                            )
-                        else:
-                            self.collection.add(
-                                ids = [batch_ids[j]],
-                                metadatas = [batch_metadatas[j]],
-                                documents = [batch_texts[j]],
-                            )
+                        self.collection.add(
+                            ids=[batch_ids[j]],
+                            documents=[batch_texts[j]],
+                            metadatas=[batch_metadatas[j]],
+                        )
                         total_added += 1
-                    except:
+                    except Exception:
                         logger.error(f"Failed to add document {batch_ids[j]}")
 
         logger.info(f"Added {total_added}/{len(documents)} documents")
@@ -209,8 +181,8 @@ class ChromaDBVectorStore:
                 "ids": results["ids"][0] if results["ids"] else [],
                 "documents": results["documents"][0] if results["documents"] else [],
                 "metadatas": results["metadatas"][0] if results["metadatas"] else [],
-                "distance": results["distance"][0] if results["distance"] else [],
-                "similarities": [1 - d for d in results["distance"][0]] if results["distance"] else [],
+                "distances": results["distances"][0] if results["distances"] else [],
+                "similarities": [1 - d for d in results["distances"][0]] if results["distances"] else [],
             }
             logger.info(f"Found {len(processed_results['ids'])} results for {query}")
             return processed_results
@@ -231,7 +203,7 @@ class ChromaDBVectorStore:
 
         try:
             results = self.collection.query(
-                query_embedding = [query_embedding.tolist()],
+                query_embeddings = [query_embedding.tolist()],
                 n_results = n_results,
                 where = where,
             )
@@ -240,8 +212,8 @@ class ChromaDBVectorStore:
                 "ids": results["ids"][0] if results["ids"] else [],
                 "documents": results["documents"][0] if results["documents"] else [],
                 "metadatas": results["metadatas"][0] if results["metadatas"] else [],
-                "distance": results["distance"][0] if results["distance"] else [],
-                "similarities": results["similarities"][0] if results["similarities"] else [],
+                "distances": results["distances"][0] if results["distances"] else [],
+                "similarities": [1 - d for d in results["distances"][0]] if results["distances"] else [],
             }
             return processed_results
 
@@ -276,16 +248,15 @@ class ChromaDBVectorStore:
         Update document
         """
         try:
-            update_data = {}
+            update_data = {"ids": [document_id]}
 
             if text is not None:
-                update_data["document"] = text
+                update_data["documents"] = [text]
 
             if metadata is not None:
-                update_data["metadata"] = metadata
+                update_data["metadatas"] = [metadata]
 
-            if update_data:
-                update_data["ids"] = [document_id]
+            if len(update_data) > 1:
                 self.collection.update(**update_data)
                 logger.info(f"Updated document {document_id}")
 
@@ -315,7 +286,7 @@ class ChromaDBVectorStore:
 
             stats = {
                 "total_documents": count,
-                "sample_size": len(sample["ids"] if sample["ids"] else 0),
+                "sample_size": len(sample["ids"]) if sample["ids"] else 0,
                 "metadata_fields": set(),
                 "timestamp": datetime.now().isoformat(),
             }
@@ -330,7 +301,7 @@ class ChromaDBVectorStore:
 
         except Exception as e:
             logger.error(f"Failed to get collection stats: {e}")
-            return {"error": str(e)}
+            return {"error": str(e), "total_documents": 0}
 
     def export_collection(self, export_path: str):
         """

@@ -1,5 +1,6 @@
 import torch
 from sentence_transformers import SentenceTransformer
+from chromadb.api.types import Documents, Embeddings, EmbeddingFunction
 from typing import List, Dict, Any, Optional, Union
 import numpy as np
 import time
@@ -188,6 +189,23 @@ class EmbeddingManager:
             raise ValueError(f"Unknown metric {metric}")
 
         return similarity
+
+    def chroma_embedding_function(self):
+        """
+        Returns a class instance compatible with ChromaDB
+        """
+        return ChromaEmbeddingAdapter(self)
+
+class ChromaEmbeddingAdapter(EmbeddingFunction):
+    def __init__(self, manager: 'EmbeddingManager'):
+        self.manager = manager
+
+    def __call__(self, input: Documents) -> Embeddings:
+        embeddings = self.manager.encode(
+            list(input),
+            show_progress_bar=False
+        )
+        return embeddings.tolist()
 
 class EmbeddingBenchmark:
 
