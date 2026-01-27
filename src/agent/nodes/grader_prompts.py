@@ -29,7 +29,7 @@ class PromptFactory:
     Factory for relevance grading prompts.
     """
     @staticmethod
-    def crate_binary_grading_prompt() -> GradingPrompt:
+    def create_binary_grading_prompt() -> GradingPrompt:
         system_template ="""
         You are an expert in document relevance assessment.
         Your task is to determine whether the given document is relevant to the user's question.
