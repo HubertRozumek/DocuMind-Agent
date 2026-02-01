@@ -153,6 +153,22 @@ class GeneratorNode:
             """
             logger.info(f"[Generator Function] Generating answer with {len(state.get('relevant_docs', []))} documents")
 
+            if state.get("tool_result"):
+                return StateManager.update_state(
+                    state,
+                    answer=state["tool_result"],
+                    confidence=0.95,
+                    metadata={
+                        **state.get("metadata", {}),
+                        "generation_result": {
+                            "answer": state["tool_result"],
+                            "confidence": 0.95,
+                            "sources_used": 0,
+                            "tool_used": state.get("tool_used"),
+                        }
+                    }
+                )
+
             relevant_docs = state.get("relevant_docs", [])
             question = state.get("question", "")
 
@@ -162,6 +178,12 @@ class GeneratorNode:
                 if all_docs:
                     relevant_docs = all_docs[:2]
                     logger.warning("No relevant docs found, using retrieved docs with low confidence")
+                else:
+                    return StateManager.update_state(
+                        state,
+                        answer="I couldn't find any documents to answer your question.",
+                        confidence=0.0
+                    )
 
             generation_result = self.generate_answer(
                 question=question,
