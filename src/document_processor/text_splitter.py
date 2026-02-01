@@ -220,7 +220,7 @@ class ChunkAnalyzer:
             "avg_length": np.mean(lengths),
             "min_length": np.min(lengths),
             "max_length": np.max(lengths),
-            "std": np.std(lengths),
+            "std_length": np.std(lengths),
             "total_characters": sum(lengths),
             "chunk_size_distribution": {
                 "small": len([l for l in lengths if l < 100]),
@@ -291,4 +291,3 @@ class ChunkAnalyzer:
 
         results.sort(key=lambda x: x["score"], reverse=True)
         return results
-
