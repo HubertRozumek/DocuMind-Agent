@@ -180,10 +180,19 @@ class DocuMindAgentBuilder:
             "iterations": 0,
             "max_iterations": self.max_iterations,
             "search_threshold": self.search_threshold,
+            "history": [],
+            "documents": [],
+            "relevant_docs": [],
+            "confidence": 0.0,
+            "needs_rewrite": False,
+            "rewritten_questions": [],
             "metadata": {
                 "agent_version": "1.0",
                 "max_iterations": self.max_iterations
-            }
+            },
+            "search_history": [],
+            "decision_log": [],
+            "current_rewrite_index": 0,
         }
 
         if config:
@@ -199,39 +208,55 @@ class DocuMindAgentBuilder:
 
             edge_stats = self.edge_router.get_edge_statistics()
 
-            response = {
-                "answer": result.get("answer", "I couldn't find an answer to your question."),
-                "relevant_documents": result.get("relevant_docs", []),
-                "confidence": result.get("confidence", 0.0),
-                "iterations_used": result.get("iterations", 0),
+            iterations_used = result.get("iterations", 0)
+
+            return {
+                "answer": result.get(
+                    "answer",
+                    "I couldn't find an answer to your question."
+                ),
+                "confidence": float(result.get("confidence", 0.0)),
+                "iterations_used": iterations_used,
                 "max_iterations": self.max_iterations,
                 "search_threshold": self.search_threshold,
+                "relevant_documents": result.get("relevant_docs", []),
                 "metadata": result.get("metadata", {}),
                 "edge_statistics": edge_stats,
                 "state_summary": {
-                    "question": result.get("question"),
+                    "question": result.get("question", question),
                     "has_answer": bool(result.get("answer")),
                     "documents_found": len(result.get("documents", [])),
                     "relevant_documents": len(result.get("relevant_docs", [])),
                     "needed_rewrite": result.get("needs_rewrite", False),
-                    "rewritten_questions": result.get("rewritten_questions", [])
+                    "rewritten_questions": result.get("rewritten_questions", result.get("metadata", {}).get("rewritten_questions", [])),
                 }
             }
 
-            logger.info(f"Agent completed in {result.get('iterations', 0)} iterations")
-            logger.info(f"Answer confidence: {result.get('confidence', 0.0):.2f}")
-
-            return response
-
         except Exception as e:
+
             logger.error(f"Agent invocation failed: {e}")
 
             return {
+
                 "answer": f"An error occurred while processing your question: {str(e)}",
-                "error": str(e),
-                "error_type": type(e).__name__,
-                "iterations_used": 0,
-                "confidence": 0.0
+                "confidence": 0.0,
+                "iterations_used": initial_state["iterations"],
+                "max_iterations": self.max_iterations,
+                "search_threshold": self.search_threshold,
+                "relevant_documents": [],
+                "metadata": {
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                },
+                "edge_statistics": self.edge_router.get_edge_statistics(),
+                "state_summary": {
+                    "question": question,
+                    "has_answer": False,
+                    "documents_found": 0,
+                    "relevant_documents": 0,
+                    "needed_rewrite": False,
+                    "rewritten_questions": []
+                }
             }
 
     def get_graph_visualization(self) -> str:
