@@ -1,11 +1,7 @@
-import os
-import sys
 from datetime import datetime
 
 import numpy as np
 import pytest
-from nltk.corpus.reader import documents
-from oauthlib.uri_validate import query
 
 from src.agent.graph_state import StateManager, serialize_state
 from src.agent.nodes.retriever_node import RetrieverFactory
@@ -43,7 +39,8 @@ def test_graph_state_lifecycle():
 
     validation = StateManager.validate_state(updated_state)
     assert validation["is_valid"] is True
-    assert validation["errors"] == {}
+    assert validation["errors"] == []
+    assert validation["warnings"] == []
 
     state_json = serialize_state(updated_state)
     assert isinstance(state_json, str)
