@@ -130,7 +130,10 @@ class GraderNode:
                 expected_format="JSON" if self.grading_strategy != GradingStrategy.BINARY else "YES/NO"
             )
 
-            if self.fallback_manager and not parsed_result.get("relevant", False):
+            if (
+                    self.fallback_manager
+                    and parsed_result.get("confidence", 0) < self.confidence_threshold * 0.7
+            ):
                 fallback_result = self.fallback_manager.execute_fallback(
                     question=question,
                     document=document,
@@ -266,11 +269,13 @@ class GraderNode:
 
             if not documents:
                 logger.warning("No documents to grade")
+                should_rewrite = (state["iterations"] < state["max_iterations"])
                 return StateManager.update_state(
                     state,
                     relevant_docs=[],
                     confidence=0.0,
-                    needs_rewrite=True,
+                    needs_rewrite=should_rewrite,
+                    iterations=state["iterations"] + 1,
                     metadata={
                         **state.get("metadata", {}),
                         "grading_result": {
@@ -293,17 +298,24 @@ class GraderNode:
                     state["iterations"] < state["max_iterations"]
             )
 
+            relevant = [
+                r.get("final_confidence", 0.0)
+                for r in grading_result["individual_results"]
+                if r.get("is_relevant")
+            ]
+            confidence = max(relevant) if relevant else grading_result["avg_confidence"]
+
             updated_state = StateManager.update_state(
                 state,
                 relevant_docs=grading_result["relevant_documents"],
-                confidence=grading_result["avg_confidence"],
+                confidence=confidence,
                 needs_rewrite=needs_rewrite,
+                increment_iterations=True,
                 metadata={
                     **state.get("metadata", {}),
                     "grading_result": grading_result,
                     "current_iteration": state["iterations"]
-                },
-                increment_iterations=True
+                }
             )
 
             history_entry = {
