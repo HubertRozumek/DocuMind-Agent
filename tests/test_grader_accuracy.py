@@ -6,6 +6,7 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 
 from src.agent.nodes.grader_model import GraderFactory, BaseGraderModel
 from src.agent.nodes.grader_prompts import PromptFactory
+from src.agent.nodes.grader_model import MockGrader
 
 @pytest.fixture(scope="session")
 def grader_dataset(tmp_path_factory):
@@ -196,8 +197,6 @@ def test_mock_grader_handles_invalid_prompt(perfect_grader):
     parsed = json.loads(result)
 
     assert "relevant" in parsed
-
-from src.agent.nodes.grader_model import MockGrader
 
 def test_validate_response_json():
     grader = MockGrader()
