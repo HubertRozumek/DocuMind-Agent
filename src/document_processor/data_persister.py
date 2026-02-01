@@ -42,7 +42,7 @@ class DataPersister:
         metadata = {
             "generated_at": datetime.now().isoformat(),
             "total_chunks": len(chunks),
-            "total_documents": len(set(ch.metadata("doc_id", "") for ch in chunks)),
+            "total_documents": len(set(ch.metadata.get("doc_id", "") for ch in chunks)),
             "chunk_schema": {
                 "text": "string",
                 "metadata": "dict",
@@ -80,10 +80,10 @@ class DataPersister:
                 "chunk_id": chunk.chunk_id,
                 "text": chunk.text,
                 "text_length": len(chunk.text),
-                "document": chunk.metadata("doc_id", "unknown"),
-                "strategy": chunk.metadata("strategy", "unknown"),
-                "page": chunk.metadata("page", ""),
-                "timestamp": chunk.metadata("timestamp", ""),
+                "document": chunk.metadata.get("doc_id", ""),
+                "strategy": chunk.metadata.get("strategy", "unknown"),
+                "page": chunk.metadata.get("page", ""),
+                "timestamp": chunk.metadata.get("timestamp", ""),
             }
             rows.append(row)
 
