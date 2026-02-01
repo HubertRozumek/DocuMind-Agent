@@ -12,6 +12,14 @@ from src.agent.nodes.grader_fallback import (
     ErrorRecoverySystem,
 )
 
+def is_ollama_available():
+    try:
+        import requests
+        response = requests.get("http://localhost:11434/api/tags", timeout=1)
+        return response.status_code == 200
+    except:
+        return False
+
 def test_prompt_factory_creates_prompts():
     factory = PromptFactory()
 
@@ -38,6 +46,8 @@ def test_mock_grader_basic_grading():
     assert isinstance(parsed, dict)
     assert "relevant" in parsed
 
+@pytest.mark.integration
+@pytest.mark.skipif(not is_ollama_available(), reason="Ollama not running")
 def test_ollama_grader_if_available():
     try:
         grader = GraderFactory.create_grader(
