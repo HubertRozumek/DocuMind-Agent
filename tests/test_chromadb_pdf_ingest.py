@@ -78,7 +78,9 @@ def test_chromadb_integration_flow(chroma_store, sample_documents, embeddings_ma
     )
 
     assert "3" in emb_results["ids"]
-    assert "distance" in emb_results or "similarities" in emb_results
+    assert "similarities" in emb_results
+    assert len(emb_results["similarities"]) == 2
+    assert all(isinstance(s, float) for s in emb_results["similarities"])
 
     doc = chroma_store.get_document("2")
     assert doc is not None
