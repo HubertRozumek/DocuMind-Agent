@@ -14,7 +14,7 @@ class GraphState(TypedDict, total=False):
         documents: lsit of documents
         relevant_docs: lsit of relevant documents
         rewritten_question: rewritten question
-        answear: Definitive answer
+        answer: Definitive answer
         iterations: number of iterations
         search_query: search query
         current_document_index: current document index
@@ -32,7 +32,7 @@ class GraphState(TypedDict, total=False):
     documents: List[str]
     relevant_docs: List[str]
     rewritten_question: Optional[str]
-    answear: Optional[str]
+    answer: Optional[str]
     iterations: int
     search_query: Optional[str]
     current_document_index: int
@@ -44,6 +44,13 @@ class GraphState(TypedDict, total=False):
     max_iterations: int
     metadata: Dict[str, Any]
     error: Optional[str]
+    search_history: List[str]
+    decision_log: List[Dict[str, Any]]
+    rewritten_questions: List[str]
+    current_rewrite_index: int
+    tool_used: Optional[str]
+    tool_result: Optional[Any]
+    skip_retrieval: bool
 
 class StateManager:
     """
@@ -163,8 +170,8 @@ class StateManager:
         Returns:
             Dictionary of errors
         """
-        errors = {}
-        warnings = {}
+        errors = []
+        warnings = []
 
         if state["iterations"] > state["max_iterations"]:
             errors.append(f"Max iterations reached: {state['iterations']}/{state['max_iterations']}")
