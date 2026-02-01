@@ -101,3 +101,20 @@ def test_collection_stats_and_empty(store):
     stats_full = store.get_collection_stats()
     assert stats_full["total_documents"] == 5
     assert "metadata_fields" in stats_full
+
+def test_search_empty_collection(store):
+    results = store.search(query="anything", n_results=5)
+    assert len(results["ids"]) == 0
+    assert len(results["documents"]) == 0
+
+
+def test_unicode_documents(store, manager):
+    docs = [
+        {"id": "unicode1", "text": "Zażółć gęślą jaźń 🎉", "metadata": {}},
+        {"id": "unicode2", "text": "Привет мир 你好世界", "metadata": {}},
+    ]
+    added = store.add_documents(docs)
+    assert added == 2
+
+    results = store.search(query="jaźń", n_results=1)
+    assert "unicode1" in results["ids"]
