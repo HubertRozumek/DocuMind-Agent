@@ -64,6 +64,9 @@ class RetrieverNode:
             #[1] - Prepare query
             processed_query = self._preprocess_query(query, state)
 
+            if state and "search_threshold" in state:
+                self.search_config["score_threshold"] = state["search_threshold"]
+
             #[2] - Search the vector store
             search_results = self._search_vector_store(processed_query)
 
@@ -155,7 +158,7 @@ class RetrieverNode:
             "k": self.search_config["k"] * 2,
         }
 
-        if self.search_config["filter_metadata"]:
+        if self.search_config.get("filter_metadata"):
             search_kwargs["where"] = self.search_config["filter_metadata"]
 
         try:
@@ -386,19 +389,24 @@ class RetrieverNode:
             logger.info(f"[Retriever Function] Iteration {state['iterations']}")
             logger.info(f"[Retriever Function] Query {state['search_query']}")
 
-            results = self.retrieve(state['search_query'], state)
+            query = state.get("search_query") or state.get("question")
+            results = self.retrieve(query, state)
 
-            updated_state = StateManager.update_state(
-                state,
-                documents = results.get("documents", []),
-                confidence = results.get("confidence", 0.0),
-                metadata = {
+            new_state = dict(state)
+
+            new_state = StateManager.update_state(
+                new_state,
+                documents=results.get("documents", []),
+                confidence=results.get("confidence", 0.0),
+                iterations=state.get("iterations", 0) + 1,
+                metadata={
                     **state.get("metadata", {}),
                     "retrieval_results": {
                         "summary": results.get("summary"),
                         "stats": results.get("stats", {}),
                         "timestamp": results.get("timestamp"),
-                        "query_used": results.get("query")
+                        "query_used": results.get("query"),
+                        "metadatas": results.get("metadatas", [])
                     }
                 }
             )
@@ -409,18 +417,20 @@ class RetrieverNode:
                 "content": f"Retrieved {len(results.get('documents', []))} documents.",
                 "confidence": results.get("confidence", 0.0),
                 "details": {
-                    "query": state['search_query'],
+                    "query": state.get('search_query'),
                     "documents_found": len(results.get("documents", [])),
                     "avg_similarity": results.get("stats", {}).get("avg_similarity", 0.0)
                 }
             }
 
-            updated_state = StateManager.add_to_history(updated_state, history_entry)
+            history = list(new_state.get("history", []))
+            history.append(history_entry)
+            new_state["history"] = history
 
             logger.info(f"[Retriever Function] Found {len(results.get('documents', []))} documents.")
             logger.info(f"[Retriever Function] Confidence {results.get('confidence', 0.0):.2f}")
 
-            return updated_state
+            return new_state
 
         return RunnableLambda(retriever_function)
 
@@ -455,7 +465,7 @@ class RetrieverFactory:
             )
 
             logger.info(f"Created ChromaDB retriever for: {collection_name}")
-            return RetrieverNode(vector_store, search_config=search_config)
+            return RetrieverNode(vector_store=vector_store, search_config=search_config)
 
         except Exception as e:
             logger.error(f"Failed to creating ChromaDB retriever: {e}")
