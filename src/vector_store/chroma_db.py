@@ -1,6 +1,6 @@
 import chromadb
 from chromadb.config import Settings
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Optional
 import uuid
 import numpy as np
 import os
@@ -18,7 +18,8 @@ class ChromaDBVectorStore:
                  collection_name: str = "documents",
                  persist_directory: str = "data/vector_store/chroma",
                  embedding_function = None,
-                 reset_on_start: bool = False):
+                 reset_on_start: bool = False,
+                 client=None):
         """
         Args:
             collection_name: name of the collection in ChromaDB
@@ -33,7 +34,7 @@ class ChromaDBVectorStore:
 
         os.makedirs(self.persist_directory, exist_ok=True)
 
-        self.client = None
+        self.client = client
         self.collection = None
 
         self._initialize_client()
@@ -43,8 +44,11 @@ class ChromaDBVectorStore:
         Initialize the client to connect to ChromaDB
         """
         try:
-
-            self.client = chromadb.PersistentClient(path=self.persist_directory)
+            if self.client is None:
+                self.client = chromadb.PersistentClient(
+                    path=self.persist_directory,
+                    settings=Settings(anonymized_telemetry=False)
+                )
 
             if self.reset_on_start:
                 try:
@@ -83,62 +87,83 @@ class ChromaDBVectorStore:
     def add_documents(self,
                       documents: List[Dict[str, Any]],
                       batch_size: int = 100) -> int:
-        """
-        Add documents to vector store
+        """Add documents to vector store"""
 
-        Args:
-            documents: list of documents
-            embeddings optional embeddings(if None, will be calculated)
-            batch_size: number of documents to add
-
-        Returns:
-            number of added documents
-        """
         if not documents:
             logger.warning("No documents to add")
             return 0
 
-        total_added = 0
+        logger.info(f"add_documents called with {len(documents)} documents")
 
+        existing_ids = set()
+        try:
+            # Get all existing IDs
+            all_docs = self.collection.get()
+            if all_docs and all_docs.get("ids"):
+                existing_ids = set(all_docs["ids"])
+                logger.info(f"Found {len(existing_ids)} existing documents in collection")
+        except Exception as e:
+            logger.warning(f"Could not fetch existing IDs: {e}")
+
+        total_added = 0
         ids = []
         texts = []
         metadatas = []
+        skipped = 0
 
         for i, doc in enumerate(documents):
             if "text" not in doc:
-                logger.warning(f"Document {i} has no text")
+                logger.warning(f"Document {i} has no text, skipping")
                 continue
 
             doc_id = doc.get("id", str(uuid.uuid4()))
+
+            # SKIP if already exists
+            if doc_id in existing_ids:
+                logger.debug(f"Document {doc_id} already exists, skipping")
+                skipped += 1
+                continue
 
             ids.append(doc_id)
             texts.append(doc["text"])
 
             metadata = doc.get("metadata", {}).copy()
-            metadata["source"] = doc.get("source","unknown")
+            metadata["source"] = doc.get("source", "unknown")
             metadata["timestamp"] = datetime.now().isoformat()
             metadata["text_length"] = len(doc["text"])
-
             metadatas.append(metadata)
 
+        if skipped > 0:
+            logger.info(f"Skipped {skipped} duplicate documents")
+
+        if not ids:
+            logger.warning("No new documents to add (all duplicates)")
+            return 0
+
+        logger.info(f"Prepared {len(ids)} NEW documents for insertion")
+
+        # ... rest of the batching code stays the same
         for i in range(0, len(ids), batch_size):
-            batch_ids = ids[i:i+batch_size]
-            batch_texts = texts[i:i+batch_size]
-            batch_metadatas = metadatas[i:i+batch_size]
+            batch_ids = ids[i:i + batch_size]
+            batch_texts = texts[i:i + batch_size]
+            batch_metadatas = metadatas[i:i + batch_size]
 
             try:
+                logger.info(f"Adding batch {i // batch_size + 1}: {len(batch_ids)} documents")
+
                 self.collection.add(
-                    ids = batch_ids,
-                    metadatas = batch_metadatas,
-                    documents = batch_texts
+                    ids=batch_ids,
+                    metadatas=batch_metadatas,
+                    documents=batch_texts
                 )
 
                 total_added += len(batch_ids)
-                logger.info(f"Added {i//batch_size + 1}: {len(batch_ids)} documents")
+                logger.info(f"Batch {i // batch_size + 1} added successfully")
 
             except Exception as e:
-                logger.error(f"Failed to add {i//batch_size + 1}: {e}")
+                logger.error(f"Batch {i // batch_size + 1} failed: {e}")
 
+                # Fallback individual insertion
                 for j in range(len(batch_ids)):
                     try:
                         self.collection.add(
@@ -147,11 +172,14 @@ class ChromaDBVectorStore:
                             metadatas=[batch_metadatas[j]],
                         )
                         total_added += 1
-                    except Exception:
-                        logger.error(f"Failed to add document {batch_ids[j]}")
+                    except Exception as inner_e:
+                        logger.error(f"Failed to add document {batch_ids[j]}: {inner_e}")
 
-        logger.info(f"Added {total_added}/{len(documents)} documents")
-        self._log_collection_stats()
+        logger.info(f"Added {total_added}/{len(documents)} documents (skipped {skipped} duplicates)")
+
+        final_count = self.collection.count()
+        logger.info(f"Collection now has {final_count} documents")
+
         return total_added
 
     def search(self,
