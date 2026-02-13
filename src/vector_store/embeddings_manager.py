@@ -1,12 +1,15 @@
 import torch
 from sentence_transformers import SentenceTransformer
 from chromadb.api.types import Documents, Embeddings, EmbeddingFunction
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Optional, Union
 import numpy as np
 import time
 import logging
 from enum import Enum
 import os
+
+import warnings
+warnings.filterwarnings("ignore", message=".*torch.classes.*")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -19,13 +22,14 @@ class EmbeddingModelType(Enum):
     ADA_002 = "text-embedding-ada-002"
     E5_SMALL = "intfloat/multilingual-e5-small"
     E5_LARGE = "intfloat/multilingual-e5-large"
+    MPNET = "sentence-transformers/all-mpnet-base-v2"
 
 class EmbeddingManager:
     """
     Manager class for embedding models
     """
 
-    def __init__(self,model_type: Union[EmbeddingModelType, str] = EmbeddingModelType.MULTILINGUAL_MINILM, device: Optional[str] = None, cache_dir: str ="models/cache"):
+    def __init__(self,model_type: Union[EmbeddingModelType, str] = EmbeddingModelType.MPNET, device: Optional[str] = None, cache_dir: str ="models/cache"):
         """
         Args:
             model_type: model type
@@ -71,8 +75,8 @@ class EmbeddingManager:
 
             if self.model_type == EmbeddingModelType.ADA_002:
                 logger.warning(f"OpenAI ADA-002 requires API key")
-                self.model_type = EmbeddingModelType.MULTILINGUAL_MINILM
-                self.model_name = self.model_type.name
+                self.model_type = EmbeddingModelType.MPNET
+                self.model_name = self.model_type.value
 
             self.model = SentenceTransformer(
                 model_name_or_path=self.model_name,
@@ -206,11 +210,3 @@ class ChromaEmbeddingAdapter(EmbeddingFunction):
             show_progress_bar=False
         )
         return embeddings.tolist()
-
-class EmbeddingBenchmark:
-
-    def benchmarkmodel(self):
-        pass
-
-    def quality_evaluation(self):
-        pass
