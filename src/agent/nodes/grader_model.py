@@ -1,20 +1,36 @@
-import os
 import json
 import logging
-from typing import List, Dict, Any, Optional, Union, Callable
+from typing import List, Dict, Any, Optional
 import time
 from abc import ABC, abstractmethod
 import requests
-import subprocess
-import numpy as np
+import re
 
 logger = logging.getLogger(__name__)
+
 
 class BaseGraderModel(ABC):
     """
     Abstract base class for grading models.
+
+    Defines interface for document grading with support for single
+    and batch grading, response validation, and fallback strategies.
+
+    Attributes:
+        model_name: Name of the model to use
+        config: Configuration dictionary
+        retry_count: Number of retries for failed requests
+        timeout: Request timeout in seconds
     """
+
     def __init__(self, model_name: str, **kwargs):
+        """
+        Initialize base grader model.
+
+        Args:
+            model_name: Model identifier
+            **kwargs: Configuration options including retry_count and timeout
+        """
         self.model_name = model_name
         self.config = kwargs
         self.retry_count = kwargs.get("retry_count", 3)
@@ -23,26 +39,53 @@ class BaseGraderModel(ABC):
     @abstractmethod
     def grade(self, prompt: str, system_prompt: Optional[str] = None) -> str:
         """
-        Performs prompt-based assessment.
+        Perform single document grading.
+
+        Args:
+            prompt: Grading prompt with question and document
+            system_prompt: Optional system instructions
+
+        Returns:
+            Model response as string
         """
         pass
 
     @abstractmethod
     def grade_batch(self, prompts: List[str], system_prompts: Optional[List[str]] = None) -> List[str]:
         """
-        Performs evaluation for batch of prompts.
+        Perform batch grading for multiple documents.
+
+        Args:
+            prompts: List of grading prompts
+            system_prompts: Optional list of system prompts
+
+        Returns:
+            List of model responses
         """
         pass
 
     def validate_response(self, response: str, expected_format: str) -> Dict[str, Any]:
         """
-        Validates model response.
+        Validate and parse model response.
+
+        Args:
+            response: Raw model response
+            expected_format: Expected format ("json" or "YES/NO")
+
+        Returns:
+            Parsed response dictionary
         """
         try:
             if expected_format.lower() == "json":
-                return json.loads(response.strip())
+                try:
+                    return json.loads(response.strip())
+                except json.JSONDecodeError:
+                    logger.warning(f"Invalid JSON response: {response[:100]}")
+                    return self._fix_json_response(response)
+
             elif expected_format.lower() == "YES/NO":
                 return {"relevant": self._parse_boolean(response)}
+
             else:
                 return {"raw": response}
 
@@ -50,28 +93,99 @@ class BaseGraderModel(ABC):
             logger.warning(f"Invalid JSON response: {response[:100]}")
             return self._fix_json_response(response)
 
+    def _fallback_grade(self, prompt: str) -> str:
+        """
+        Fallback grading when primary model is unavailable.
+
+        Uses simple keyword matching between question and document.
+
+        Args:
+            prompt: Grading prompt
+
+        Returns:
+            JSON string with relevance assessment
+        """
+        logger.warning("Using fallback grading (primary model not available)")
+
+        question_keywords = self._extract_keywords(prompt.split("QUESTION:")[1].split("DOCUMENT:")[0])
+        document_text = prompt.split("DOCUMENT:")[1] if "DOCUMENT:" in prompt else ""
+        document_keywords = self._extract_keywords(document_text)
+
+        matches = len(set(question_keywords) & set(document_keywords))
+
+        if matches >= 2:
+            return '{"relevant": true, "reason": "Fallback: keyword match"}'
+        else:
+            return '{"relevant": false, "reason": "Fallback: insufficient keyword match"}'
+
+    def _extract_keywords(self, text: str, max_keywords: int = 10) -> List[str]:
+        """
+        Extract keywords from text, filtering stop words.
+
+        Args:
+            text: Source text
+            max_keywords: Maximum keywords to return
+
+        Returns:
+            List of keywords
+        """
+        stop_words = ["i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you", "your", "yours", "yourself",
+                      "yourselves", "he", "him", "his", "himself", "she", "her", "hers", "herself", "it", "its",
+                      "itself", "they", "them", "their", "theirs", "themselves", "what", "which", "who", "whom", "this",
+                      "that", "these", "those", "am", "is", "are", "was", "were", "be", "been", "being", "have", "has",
+                      "had", "having", "do", "does", "did", "doing", "a", "an", "the", "and", "but", "if", "or",
+                      "because", "as", "until", "while", "of", "at", "by", "for", "with", "about", "against", "between",
+                      "into", "through", "during", "before", "after", "above", "below", "to", "from", "up", "down",
+                      "in", "out", "on", "off", "over", "under", "again", "further", "then", "once", "here", "there",
+                      "when", "where", "why", "how", "all", "any", "both", "each", "few", "more", "most", "other",
+                      "some", "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too", "very", "s", "t",
+                      "can", "will", "just", "don", "should", "now"]
+
+        words = text.lower().split()
+        keywords = [w for w in words if w not in stop_words and len(w) > 3]
+        return list(set(keywords))[:max_keywords]
+
     def _parse_boolean(self, response: str) -> bool:
         """
-        Parsing a text response into a boolean value.
+        Parse text response into boolean relevance value.
+
+        Args:
+            response: Text response to parse
+
+        Returns:
+            True if relevant, False otherwise
         """
         response_lower = response.strip().lower()
 
-        true_keywords = ['yes','true','y','relevant']
-        false_keywords = ['no','false','n','not relevant']
+        if any(pattern in response_lower for pattern in ['not relevant', 'false', 'no', 'irrelevant']):
+            return False
 
-        for keyword in true_keywords:
-            if keyword in response_lower: return True
-
-        for keyword in false_keywords:
-            if keyword in response_lower: return False
+        if any(pattern in response_lower for pattern in ['yes', 'true', 'relevant']):
+            return True
 
         logger.warning(f"Could not parse boolean response: {response}")
         return False
 
     def _fix_json_response(self, response: str) -> Dict[str, Any]:
         """
-        Attempts to repair a corrupted JSON response.
+        Attempt to repair malformed JSON responses.
+
+        Tries multiple strategies: regex extraction, line-based reconstruction,
+        and heuristic keyword analysis as final fallback.
+
+        Args:
+            response: Malformed JSON string
+
+        Returns:
+            Parsed dictionary or heuristic result
         """
+        json_match = re.search(r'\{[^}]+\}', response)
+        if json_match:
+            try:
+                return json.loads(json_match.group(0))
+            except json.JSONDecodeError:
+                pass
+
         lines = response.strip().split('\n')
         json_lines = []
 
@@ -88,28 +202,59 @@ class BaseGraderModel(ABC):
 
         try:
             return json.loads(cleaned)
-        except:
+        except json.JSONDecodeError:
+            logger.warning("Could not parse JSON, using heuristic fallback")
+
+            lower_resp = response.lower()
+            relevant_keywords = ['create', 'use', 'example', 'numpy', 'array', 'function']
+            irrelevant_keywords = ['cannot', 'not found', 'no information', 'unclear']
+
+            relevant_score = sum(1 for kw in relevant_keywords if kw in lower_resp)
+            irrelevant_score = sum(1 for kw in irrelevant_keywords if kw in lower_resp)
+
+            is_relevant = relevant_score > irrelevant_score
+            confidence = min(0.9, relevant_score * 0.15) if is_relevant else 0.2
+
             return {
-                "relevant": False,
-                "reason": f"Could not parse JSON response: {response[:100]}",
-                "error": "invalid_json"
+                "relevant": is_relevant,
+                "confidence": confidence,
+                "reason": f"Heuristic: found {relevant_score} relevant keywords",
+                "error": "json_parse_failed",
+                "original_response": response[:100]
             }
 
 
 class OllamaGrader(BaseGraderModel):
     """
-    Grader using Ollama with local model.
+    Grader implementation using Ollama API with local models.
+
+    Connects to local Ollama instance for document grading with
+    automatic fallback to keyword-based grading if unavailable.
+
+    Attributes:
+        base_url: Ollama API endpoint URL
+        temperature: Sampling temperature
+        max_tokens: Maximum tokens to generate
+        available: Whether Ollama is available
     """
 
-    def __init__(self, model_name: str = "llama3.2:1b", **kwargs):
+    def __init__(self, model_name: str = "phi3:mini", **kwargs):
+        """
+        Initialize Ollama grader and check connection.
+
+        Args:
+            model_name: Ollama model name
+            **kwargs: Configuration including base_url, temperature, max_tokens
+        """
         super().__init__(model_name, **kwargs)
         self.base_url = kwargs.get('base_url', 'http://localhost:11434')
-        self.temperature = kwargs.get('temperature', 0.1)
+        self.temperature = kwargs.get('temperature', 0.0)
         self.max_tokens = kwargs.get('max_tokens', 200)
 
         self._check_connection()
 
     def _check_connection(self):
+        """Verify Ollama connectivity and model availability."""
         try:
             response = requests.get(f"{self.base_url}/api/tags", timeout=5)
             if response.status_code == 200:
@@ -118,16 +263,22 @@ class OllamaGrader(BaseGraderModel):
 
                 if self.model_name in model_names:
                     logger.info(f"Successfully connected to {self.model_name}")
+                    self.available = True
                 else:
-                    logger.warning(f"Failed to connect to {self.model_name}. Available models: {model_names}")
+                    logger.warning(f"Model {self.model_name} not found. Available: {model_names}")
 
                     if model_names:
                         self.model_name = model_names[0]
                         logger.info(f"Using fallback model: {self.model_name}")
+                        self.available = True
+                    else:
+                        self.available = False
             else:
                 logger.warning(f"Ollama API returned status code {response.status_code}")
+                self.available = False
+
         except requests.exceptions.ConnectionError:
-            logger.warning(f"Ollama not connected. Will use fallback strategies")
+            logger.warning("Ollama not connected. Will use fallback strategies")
             self.available = False
         except Exception as e:
             logger.error(f"Error checking Ollama: {e}")
@@ -135,10 +286,16 @@ class OllamaGrader(BaseGraderModel):
 
     def grade(self, prompt: str, system_prompt: Optional[str] = None) -> str:
         """
-        Performs assessment by Ollama
-        """
+        Grade document using Ollama API.
 
-        if hasattr(self, 'available') or not self.available:
+        Args:
+            prompt: Grading prompt
+            system_prompt: Optional system instructions
+
+        Returns:
+            Model response or fallback result
+        """
+        if not getattr(self, 'available', False):
             return self._fallback_grade(prompt)
 
         payload = {
@@ -146,6 +303,7 @@ class OllamaGrader(BaseGraderModel):
             "prompt": prompt,
             "system": system_prompt,
             "stream": False,
+            "format": "json",
             "options": {
                 "temperature": self.temperature,
                 "num_predict": self.max_tokens
@@ -167,16 +325,26 @@ class OllamaGrader(BaseGraderModel):
                     logger.warning(f"Ollama API error: {response.status_code}")
 
             except requests.exceptions.RequestException as e:
-                logger.error(f"Ollama request failed (attempt #{attempt+1}): {e}")
+                logger.error(f"Ollama request failed (attempt {attempt + 1}): {e}")
                 time.sleep(1)
+
+            except Exception:
+                wait_time = (2 ** attempt)
+                time.sleep(wait_time)
 
         return self._fallback_grade(prompt)
 
     def grade_batch(self, prompts: List[str], system_prompts: Optional[List[str]] = None) -> List[str]:
         """
-        Performs evaluation for batch of prompts.
-        """
+        Grade multiple documents sequentially.
 
+        Args:
+            prompts: List of grading prompts
+            system_prompts: Optional list of system prompts
+
+        Returns:
+            List of model responses
+        """
         results = []
 
         for i, prompt in enumerate(prompts):
@@ -189,377 +357,28 @@ class OllamaGrader(BaseGraderModel):
 
         return results
 
-    def _fallback_grade(self, prompt: str) -> str:
-        """
-        Fallback when Ollama is not available.
-        Simple keyword-based fallback.
-        """
-        logger.warning("Using fallback grading (Ollama not available)")
-
-        question_keywords = self._extract_keywords(prompt.split("QUESTION:")[1].split("DOCUMENT:")[0])
-        document_text = prompt.split("DOCUMENT:")[1] if "DOCUMENT:" in prompt else ""
-        document_keywords = self._extract_keywords(document_text)
-
-
-        matches = len(set(question_keywords) & set(document_keywords))
-
-        if matches >= 2:
-            return '{"relevant": true, "reason": "Fallback: keyword match"}'
-        else:
-            return '{"relevant": false, "reason": "Fallback: insufficient keyword match"}'
-
-    def _extract_keywords(self, text: str, max_keywords: int = 10) -> List[str]:
-        """
-        Extracts keywords from text.
-        """
-        stop_words = ["i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you", "your", "yours", "yourself", "yourselves", "he", "him", "his", "himself", "she", "her", "hers", "herself", "it", "its", "itself", "they", "them", "their", "theirs", "themselves", "what", "which", "who", "whom", "this", "that", "these", "those", "am", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "having", "do", "does", "did", "doing", "a", "an", "the", "and", "but", "if", "or", "because", "as", "until", "while", "of", "at", "by", "for", "with", "about", "against", "between", "into", "through", "during", "before", "after", "above", "below", "to", "from", "up", "down", "in", "out", "on", "off", "over", "under", "again", "further", "then", "once", "here", "there", "when", "where", "why", "how", "all", "any", "both", "each", "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too", "very", "s", "t", "can", "will", "just", "don", "should", "now"]
-
-        words = text.lower().split()
-        keywords = [w for w in words if w not in stop_words and len(w) > 3]
-        return list(set(keywords))[:max_keywords]
-
-class LocalTransformersGrader(BaseGraderModel):
-    """
-    Grader using local models.
-    """
-    def __init__(self, model_name: str = "distilbert/distilroberta-base", **kwargs):
-        super().__init__(model_name, **kwargs)
-        self.model = None
-        self.tokenizer = None
-        self.device = kwargs.get('device', 'cpu')
-
-        self._load_model()
-
-    def _load_model(self):
-        """
-        Loads model.
-        """
-
-        try:
-            from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
-
-            logger.info(f"Loading transformers model: {self.model_name}")
-
-            if "gpt2" in self.model_name:
-                self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-                self.model = AutoModelForCausalLM.from_pretrained(
-                    self.model_name,
-                    torch_dtype="auto",
-                    device_map="auto"
-                )
-
-                if self.tokenizer.pad_token is None:
-                    self.tokenizer.pad_token = self.tokenizer.eos_token
-
-                self.generator = pipeline(
-                    "text-generation",
-                    model=self.model,
-                    tokenizer=self.tokenizer,
-                    device=self.device,
-                )
-            else:
-                from sentence_transformers import SentenceTransformer
-                self.model = SentenceTransformer(self.model_name)
-                self.is_encoder_only = True
-
-            logger.info(f"Model loaded: {self.model_name}")
-
-        except ImportError:
-            logger.error("Transformers not installed. Install with pip install transformers")
-            raise
-        except Exception as e:
-            logger.error(f"Failed to load model: {e}")
-            raise
-
-    def grade(self, prompt: str, system_prompt: Optional[str] = None) -> str:
-        """
-        Performs evaluation through local model.
-        """
-
-        if self.model is None:
-            return self._fallback_grade(prompt)
-
-        try:
-            if hasattr(self, "generator"):
-                full_prompt = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
-
-                outputs = self.generator(
-                    full_prompt,
-                    max_length=self.config.get('max_length', 200),
-                    temperature=self.config.get('temperature', 0.1),
-                    do_sample=True,
-                    num_return_sequences=1
-                )
-
-                return outputs[0]['generated_text'].replace(full_prompt, '').strip()
-
-            elif hasattr(self, "is encoder_only"):
-                return self._semantic_grade(prompt, system_prompt)
-
-        except Exception as e:
-            logger.error(f"Failed to evaluate model: {e}")
-            return self._fallback_grade(prompt)
-
-    def _semantic_grade(self, prompt: str, system_prompt: Optional[str] = None) -> str:
-        """
-        Semantic similarity-based evaluation.
-        (for encoder only)
-        """
-
-        if 'QUESTION' in prompt and 'DOCUMENT' in prompt:
-            try:
-                question_part = prompt.split("QUESTION:")[1].split("DOCUMENT:")[0]
-                document_part = prompt.split("DOCUMENT:")[1]
-
-                embeddings = self.model.encode([question_part, document_part])
-                a = embeddings[0]
-                b = embeddings[1]
-                similarity = np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
-
-                threshold = 0.7
-                relevant = similarity > threshold
-
-                return json.dumps({
-                    "relevant": bool(relevant),
-                    "confidence": float(similarity),
-                    "reason": f"Semantic similarity: {similarity:.3f}"
-                })
-            except:
-                pass
-
-        return self._fallback_grade(prompt)
-
-    def grade_batch(self, prompts: List[str], system_prompts: Optional[List[str]] = None) -> List[str]:
-        """
-        Performs batch evaluation.
-        """
-
-        results = []
-
-        for i, prompt in enumerate(prompts):
-            system_prompt = system_prompts if system_prompts and i < len(system_prompts) else None
-            result = self.grade(prompt, system_prompt=system_prompt)
-            results.append(result)
-
-        return results
-
-class LlamaCppGrader(BaseGraderModel):
-    """
-    Grader using Llama's C++ implementation.
-    """
-
-    def __init__(self, model_path: str, **kwargs):
-        super().__init__(model_path, **kwargs)
-        self.model_path = model_path
-        self.n_gpu_layers = kwargs.get('n_gpu_layers', -1)
-        self.n_ctx = kwargs.get('n_ctx', 2048)
-
-        self._check_llama_cpp()
-
-    def _check_llama_cpp(self):
-        """
-
-        :return:
-        """
-        try:
-            from llama.cpp import Llama
-            self.llm = Llama(
-                model_path=self.model_path,
-                n_gpu_layers=self.n_gpu_layers,
-                n_ctx=self.n_ctx,
-                verbose=False
-            )
-            logger.info(f"Llama.cpp model loaded: {self.model_path}")
-            self.available = True
-        except ImportError:
-            logger.warning("Llama.cpp not installed. Install with: pip install llama-cpp-python")
-            self.available = False
-        except Exception as e:
-            logger.error(f"Failed to load llama.cpp model: {e}")
-            self.available = False
-
-    def grade(self, prompt: str, system_prompt: Optional[str] = None) -> str:
-        """
-        Performs evaluation using llama.cpp.
-        """
-        if not hasattr(self, "available") or not self.available:
-            return self._fallback_grade(prompt)
-
-        full_prompt = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
-
-        try:
-            output = self.llm(
-                full_prompt,
-                max_tokens = self.config.get('max_tokens', 200),
-                temperature=self.config.get('temperature', 0.1),
-                echo=False
-            )
-            return output['choices'][0]['text'].strip()
-        except Exception as e:
-            logger.error(f"llama.cpp grading failed: {e}")
-            return self._fallback_grade(prompt)
-
-class MockGrader(BaseGraderModel):
-    """
-    Mock grader for tests.
-    """
-
-    def __init__(self, accuracy: float = 0.8, **kwargs):
-        super().__init__("mock", **kwargs)
-        self.accuracy = accuracy
-        self.response_patterns = [
-            '{"relevant": true, "reason": "The document answers the question directly"}',
-            '{"relevant": false, "reason": "The document does not contain information related to the question"}',
-            '{"relevant": true, "confidence": 0.85, "reason": "High semantic similarity"}',
-            '{"relevant": false, "confidence": 0.25, "reason": "Low semantic similarity"}'
-        ]
-
-    def grade(self, prompt: str, system_prompt: Optional[str] = None) -> str:
-        """
-        Return mock response.
-        """
-
-        import random
-        if random.random() < self.accuracy:
-            if "QUESTION" in prompt and "DOCUMENT" in prompt:
-                question = prompt.split("QUESTION:")[1].split("DOCUMENT:")[0].lower()
-                document = prompt.split("DOCUMENT:")[1].lower()
-
-                common_words = set(question.split()) &set(document.split())
-                if len(common_words) >= 2:
-                    return self.response_patterns[0]
-                else:
-                    return self.response_patterns[1]
-
-        return random.choice(self.response_patterns)
-
-    def grade_batch(self, prompts: List[str], system_prompts: Optional[List[str]] = None) -> List[str]:
-        return [self.grade(prompt) for prompt in prompts]
 
 class GraderFactory:
     """
-    Factory class for grading models.
+    Factory for creating grader model instances.
     """
 
     @staticmethod
     def create_grader(grader_type: str, **kwargs) -> BaseGraderModel:
         """
-        Creates a grader of the specified type.
+        Create grader of specified type.
 
         Args:
-            grader_type: 'ollama', 'transformers', 'llama_cpp', 'mock', 'hybrid'
-            **kwargs: type-specific configuration
+            grader_type: Type of grader ("ollama", etc.)
+            **kwargs: Type-specific configuration
 
         Returns:
-            BaseGraderModel instance
-        """
+            Configured grader instance
 
+        Raises:
+            ValueError: If grader_type is not supported
+        """
         if grader_type == 'ollama':
             return OllamaGrader(**kwargs)
-        elif grader_type == "transformers":
-            return LocalTransformersGrader(**kwargs)
-        elif grader_type == "llama_cpp":
-            return LlamaCppGrader(**kwargs)
-        elif grader_type == "mock":
-            return MockGrader(**kwargs)
-        elif grader_type == "hybrid":
-            return HybridGrader(**kwargs)
         else:
             raise ValueError(f"Unknown grader type: {grader_type}")
-
-class HybridGrader(BaseGraderModel):
-    """
-    Hybrid grader combining different methods
-    """
-
-    def __init__(self, **kwargs):
-        super().__init__("hybrid", **kwargs)
-        self.graders = []
-        self.fallbacks = []
-
-        try:
-            ollama_grader = OllamaGrader(**kwargs.get('ollama_config', {}))
-            if hasattr(ollama_grader, 'available') and ollama_grader.available:
-                self.graders.append(("ollama",ollama_grader))
-                logger.info("Hybrid ollama available")
-        except:
-            pass
-
-        try:
-            transformers_grader = LocalTransformersGrader(**kwargs.get('transformers_config', {}))
-            self.graders.append(("transformers", transformers_grader))
-            logger.info("Hybrid transformers available")
-        except:
-            pass
-
-        mocked_grader = MockGrader(**kwargs.get('mock_config', {}))
-        self.fallbacks.append(("mock", mocked_grader))
-
-        if not self.graders:
-            logger.warning("No grader available, using mock grader.")
-            self.graders = self.fallbacks
-
-    def grade(self, prompt: str, system_prompt: Optional[str] = None) -> str:
-        """
-        Performs evaluation using available graders.
-        """
-        results = []
-
-        for name, grader in self.graders:
-            try:
-                result = grader.grade(prompt, system_prompt)
-                validated = self._validate_grade(result, prompt)
-
-                if validated.get('confidence', 0) > 0.5:
-                    results.append((name, result, validated.get('confidence', 0)))
-                    logger.info(f"Hybrid {name} graded with confidence {validated.get('confidence', 0):.2f}")
-
-                    if validated.get('confidence', 0) > 0.8:
-                        return result
-
-            except Exception as e:
-                logger.warning(f"Hybrid {name} failed with error: {e}")
-
-        if results:
-            results.sort(key=lambda x: x[2], reverse=True)
-            best_name, best_result, best_confidence = results[0]
-            logger.info(f"Hybrid {best_name} graded with confidence {best_confidence:.2f}")
-            return best_result
-
-        for name, fallback in self.fallbacks:
-            try:
-                result = fallback.grade(prompt, system_prompt)
-                logger.warning(f"Hybrid using fallback {name}")
-                return result
-            except:
-                continue
-
-        return '{"relevant": false, "reason": "All graders failed", "confidence": 0.0}'
-
-    def _validate_grade(self, response: str, original_prompt: str) -> Dict[str, Any]:
-        """
-        Validates the grade and returns confidence.
-        """
-
-        try:
-            parsed = json.loads(response)
-
-            has_relevant = 'relevant' in parsed
-            has_reason = 'reason' in parsed
-
-            confidence = 0.5
-
-            if has_relevant and has_reason:
-                confidence = 0.8
-
-            if 'confidence' in parsed:
-                try:
-                    confidence = float(parsed['confidence'])
-                except:
-                    pass
-
-            parsed['validation_confidence'] = confidence
-            return parsed
-
-        except json.JSONDecodeError:
-            return {"relevant": False,"reason": "Invalid JSON", "confidence": 0.1}
