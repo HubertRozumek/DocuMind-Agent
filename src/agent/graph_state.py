@@ -1,37 +1,53 @@
-from typing import List, Dict, Any, Optional, Annotated, TypedDict
+from typing import List, Dict, Any, Optional
 from typing_extensions import TypedDict
-import operator
 from datetime import datetime
 import json
 import copy
+import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class GraphState(TypedDict, total=False):
     """
-    A state graph that stores all information about the course of a conversation
+    Typed dictionary representing the complete state of a RAG conversation.
+
+    Tracks all information needed for multi-turn retrieval, grading,
+    rewriting, and generation pipeline.
 
     Attributes:
-        question: orginal user question
-        documents: lsit of documents
-        relevant_docs: lsit of relevant documents
-        rewritten_question: rewritten question
-        answer: Definitive answer
-        iterations: number of iterations
-        search_query: search query
-        current_document_index: current document index
-        needs_rewrite: does the question needs to be rewritten
-        confidence: confidence score (0-1)
-        history: conversation history
-        vector_store_type: vector store type
-        search_threshold: similarity threshold for search
-        max_iterations: maximum number of iterations
-        metadata: additional metadata
-        error: error if occurred
+        question: Original user question
+        documents: Retrieved documents from vector store
+        relevant_docs: Documents passing relevance grading
+        rewritten_question: Single rewritten question (legacy)
+        rewritten_questions: List of query variations for rewriting
+        current_rewrite_index: Index of current rewrite being used
+        answer: Generated final answer
+        iterations: Current iteration count
+        search_query: Active search query (may be rewritten)
+        current_document_index: Index for document iteration
+        needs_rewrite: Flag indicating if rewrite is needed
+        confidence: Overall confidence score (0.0-1.0)
+        history: Conversation history with timestamps
+        vector_store_type: Type of vector store (e.g., "chromadb")
+        search_threshold: Minimum similarity threshold for retrieval
+        max_iterations: Maximum allowed iterations
+        metadata: Additional execution metadata
+        error: Error message if occurred
+        search_history: History of search queries
+        decision_log: Log of agent decisions
+        tool_used: Name of external tool used (if any)
+        tool_result: Result from external tool (if any)
+        skip_retrieval: Flag to skip retrieval when tool provides answer
     """
 
     question: str
     documents: List[str]
     relevant_docs: List[str]
     rewritten_question: Optional[str]
+    rewritten_questions: List[str]
+    current_rewrite_index: int
     answer: Optional[str]
     iterations: int
     search_query: Optional[str]
@@ -46,15 +62,63 @@ class GraphState(TypedDict, total=False):
     error: Optional[str]
     search_history: List[str]
     decision_log: List[Dict[str, Any]]
-    rewritten_questions: List[str]
-    current_rewrite_index: int
     tool_used: Optional[str]
     tool_result: Optional[Any]
     skip_retrieval: bool
 
+
+def _sanitize_value(value):
+    """Convert numpy types to native Python types."""
+    if isinstance(value, (np.floating, np.integer)):
+        return float(value)
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, dict):
+        return {k: _sanitize_value(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_value(v) for v in value]
+    return value
+
+
+def sanitize_numpy_types(obj: Any) -> Any:
+    """
+    Recursively convert numpy types to native Python types.
+
+    Handles numpy scalars, arrays, and nested structures.
+
+    Args:
+        obj: Object potentially containing numpy types
+
+    Returns:
+        Object with numpy types converted to Python natives
+    """
+    if isinstance(obj, (np.integer, np.floating, np.bool_)):
+        return obj.item()
+
+    if isinstance(obj, np.str_):
+        return str(obj)
+
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+
+    if isinstance(obj, dict):
+        return {key: sanitize_numpy_types(value) for key, value in obj.items()}
+
+    if isinstance(obj, list):
+        return [sanitize_numpy_types(item) for item in obj]
+
+    if isinstance(obj, tuple):
+        return tuple(sanitize_numpy_types(item) for item in obj)
+
+    return obj
+
+
 class StateManager:
     """
-    Manager class that manages state graphs
+    Manager for graph state operations.
+
+    Provides static methods for creating, updating, validating,
+    and serializing graph states with proper type handling.
     """
 
     @staticmethod
@@ -65,15 +129,16 @@ class StateManager:
             max_iterations: int = 3
     ) -> GraphState:
         """
-        Create initial state graph
+        Create initial state for new conversation.
 
         Args:
-            question: question text
-            vector_store_type: vector store type
-            search_threshold: similarity threshold for search
-            max_iterations: maximum number of iterations
+            question: User question
+            vector_store_type: Vector store backend type
+            search_threshold: Minimum similarity for retrieval
+            max_iterations: Maximum rewrite iterations
+
         Returns:
-            Initial state graph
+            Initialized GraphState
         """
         return {
             "question": question,
@@ -82,12 +147,10 @@ class StateManager:
             "rewritten_question": None,
             "answer": None,
             "iterations": 0,
-
             "search_query": question,
             "current_document_index": 0,
             "needs_rewrite": False,
             "confidence": 0.0,
-
             "history": [{
                 "role": "user",
                 "content": question,
@@ -96,7 +159,6 @@ class StateManager:
             "vector_store_type": vector_store_type,
             "search_threshold": search_threshold,
             "max_iterations": max_iterations,
-
             "metadata": {
                 "created_at": datetime.now().isoformat(),
                 "session_id": f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
@@ -106,55 +168,72 @@ class StateManager:
                     "max_results": 5
                 },
             },
-            "error": None
+            "error": None,
+            "rewritten_questions": [],
+            "current_rewrite_index": 0,
+            "search_history": [],
+            "decision_log": [],
+            "tool_used": None,
+            "tool_result": None,
+            "skip_retrieval": False,
         }
 
     @staticmethod
     def update_state(state: GraphState, **kwargs) -> GraphState:
         """
-        Update graph state
+        Update graph state while preserving critical keys.
+
+        Sanitizes numpy types and ensures preserved keys are not lost.
+        Supports special keys: "increment_iterations" and "metadata".
 
         Args:
-            state: current state
-            kwargs: fields to update
+            state: Current state
+            **kwargs: Updates to apply
+
         Returns:
-            updated state
+            Updated state
         """
         updated_state = copy.deepcopy(state)
+        kwargs = sanitize_numpy_types(kwargs)
+
+        preserved_keys = [
+            'rewritten_questions',
+            'current_rewrite_index',
+            'search_history',
+            'decision_log',
+            'tool_used',
+            'tool_result',
+        ]
 
         for key, value in kwargs.items():
-            if key in updated_state:
-                updated_state[key] = value
-            elif key in updated_state["metadata"]:
-                updated_state["metadata"][key] = value
+            if key == "increment_iterations":
+                if value:
+                    updated_state["iterations"] = updated_state.get("iterations", 0) + 1
+            elif key == "metadata":
+                existing_metadata = copy.deepcopy(updated_state.get("metadata", {}))
+                updated_state["metadata"] = {**existing_metadata, **copy.deepcopy(value)}
+            else:
+                updated_state[key] = copy.deepcopy(value)
 
-        if "answer" in kwargs and kwargs["answer"]:
-            updated_state["history"].append({
-                "role": "assistant",
-                "content": kwargs["answer"],
-                "timestamp": datetime.now().isoformat(),
-                "confidence": updated_state.get("confidence", 0.0),
-                "document_used": len(updated_state.get("relevant_docs", [])),
-            })
+        for key in preserved_keys:
+            if key not in updated_state and key in state:
+                updated_state[key] = copy.deepcopy(state[key])
+                logger.debug(f"Preserved state key: {key}")
 
-        if "iterations" in kwargs:
-            updated_state["iterations"] = kwargs["iterations"]
-        elif kwargs.get("increment_iterations", False):
-            updated_state["iterations"] += 1
+        updated_state = sanitize_numpy_types(updated_state)
 
-        StateManager._log_state_change(state, updated_state, kwargs)
+        if 'rewritten_questions' in kwargs:
+            logger.info(f"[StateUpdate] rewritten_questions set: {len(kwargs['rewritten_questions'])} items")
+        if 'current_rewrite_index' in kwargs:
+            logger.info(f"[StateUpdate] current_rewrite_index: {kwargs['current_rewrite_index']}")
+        if 'confidence' in kwargs:
+            logger.info(f"[StateUpdate] confidence updated: {kwargs['confidence']}")
 
         return updated_state
 
     @staticmethod
     def _log_state_change(old_state: GraphState, new_state: GraphState, changes: Dict):
-        """
-        Log changes in state
-        :param old_state:
-        :param new_state:
-        :param changes:
-        :return:
-        """
+        """Log state changes for debugging."""
         if old_state.get("metadata", {}).get("debug", False):
             print(f"\n[State Change] Iteration {new_state['iterations']}")
             for key, value in changes.items():
@@ -165,10 +244,15 @@ class StateManager:
     @staticmethod
     def validate_state(state: GraphState) -> Dict[str, Any]:
         """
-        Validate state and return information about errors
+        Validate state and return validation results.
+
+        Checks for constraint violations and unsupported configurations.
+
+        Args:
+            state: State to validate
 
         Returns:
-            Dictionary of errors
+            Dictionary with is_valid flag, errors, warnings, and summary
         """
         errors = []
         warnings = []
@@ -199,7 +283,13 @@ class StateManager:
     @staticmethod
     def get_state_summary(state: GraphState) -> Dict[str, Any]:
         """
-        Return summary of state
+        Get summary of current state.
+
+        Args:
+            state: Current state
+
+        Returns:
+            Dictionary with key state metrics
         """
         return {
             "question": state["question"],
@@ -216,7 +306,14 @@ class StateManager:
     @staticmethod
     def add_to_history(state: GraphState, entry: Dict[str, Any]) -> GraphState:
         """
-        Add state to history
+        Add entry to conversation history.
+
+        Args:
+            state: Current state
+            entry: History entry to add
+
+        Returns:
+            Updated state with new history entry
         """
         if "timestamp" not in entry:
             entry["timestamp"] = datetime.now().isoformat()
@@ -228,15 +325,25 @@ class StateManager:
     @staticmethod
     def get_conversation_history(state: GraphState, max_entries: int = 10) -> List[Dict[str, Any]]:
         """
-        Return conversation history
+        Get recent conversation history.
+
+        Args:
+            state: Current state
+            max_entries: Maximum number of entries to return
+
+        Returns:
+            List of recent history entries
         """
         return state["history"][-max_entries:]
 
 
 class StateEncoder(json.JSONEncoder):
     """
-    Class to convert state to JSON
+    JSON encoder for graph state serialization.
+
+    Handles datetime objects and custom objects with __dict__.
     """
+
     def default(self, obj):
         if isinstance(obj, datetime):
             return obj.isoformat()
@@ -244,15 +351,29 @@ class StateEncoder(json.JSONEncoder):
             return obj.__dict__
         return super().default(obj)
 
+
 def serialize_state(state: GraphState) -> str:
     """
-    Serialize state to JSON
+    Serialize state to JSON string.
+
+    Args:
+        state: State to serialize
+
+    Returns:
+        JSON string representation
     """
     return json.dumps(state, cls=StateEncoder, ensure_ascii=False, indent=2)
 
+
 def deserialize_state(state: str) -> GraphState:
     """
-    Deserialize state from JSON
+    Deserialize state from JSON string.
+
+    Args:
+        state: JSON string
+
+    Returns:
+        Deserialized GraphState
     """
     data = json.loads(state)
 
