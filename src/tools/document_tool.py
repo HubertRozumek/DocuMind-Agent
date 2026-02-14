@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Any, List, Optional, Callable
+from typing import Dict, Any, List, Optional
 from langchain_core.tools import Tool, StructuredTool
 from pydantic import BaseModel, Field
 
@@ -176,7 +176,6 @@ def create_document_tools(vector_store=None) -> List[Tool]:
 class ToolRouter:
     """
     Routes queries to appropriate tools or document search.
-    Implements Task 9.3: Routing to tools vs. document search.
     """
 
     def __init__(self, tools: List[Tool], vector_store=None):
@@ -274,12 +273,16 @@ class ToolRouter:
                     # Execute tool
                     try:
                         if hasattr(tool, "args_schema") and tool.args_schema:
-                            # Merge tool_kwargs with any additional kwargs
                             final_kwargs = {**tool_kwargs, **kwargs}
-                            tool_result = tool.func(**final_kwargs)
+                            if hasattr(tool, "invoke"):
+                                tool_result = tool.invoke(final_kwargs)
+                            else:
+                                tool_result = tool.func(**final_kwargs)
                         else:
-                            # Simple tool without args_schema
-                            tool_result = tool.func()
+                            if hasattr(tool, "invoke"):
+                                tool_result = tool.invoke({})
+                            else:
+                                tool_result = tool.func()
 
                         return {
                             "type": "tool",
@@ -345,7 +348,6 @@ class ToolRouter:
 class ToolErrorHandler:
     """
     Handles errors from tool execution.
-    Implements Task 9.4: Error handling for tools.
     """
 
     def __init__(self):
