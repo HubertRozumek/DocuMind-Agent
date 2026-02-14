@@ -3,6 +3,8 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 import random
 from enum import Enum
+import threading
+import html
 
 logger = logging.getLogger(__name__)
 
@@ -34,14 +36,19 @@ class MockTicketAPI:
     Simulates database with pre-populated tickets.
     """
 
-    def __init__(self, seed: int = 42):
+    def __init__(self, seed: int):
         """
         Initialize mock API with sample data.
 
         Args:
             seed: Random seed for reproducible results
         """
-        random.seed(seed)
+        if seed is not None:
+            random.seed(seed)
+            logger.warning("Mock API initialized with deterministic seed - not for production!")
+        else:
+            random.seed()
+
         self.tickets_db = self._generate_sample_tickets()
         logger.info(f"MockTicketAPI initialized with {len(self.tickets_db)} tickets")
 
@@ -277,16 +284,18 @@ class MockTicketAPI:
         Returns:
             Created ticket data
         """
-        # Validation
-        if not title or not title.strip():
+        title = html.escape(title.strip())
+        description = html.escape(description.strip())
+        category = html.escape(category.strip())
+
+        if not title:
             raise ValueError("Title cannot be empty")
-
-        if not description or not description.strip():
+        if len(title) > 200:
+            raise ValueError("Title too long (max 200 characters)")
+        if not description:
             raise ValueError("Description cannot be empty")
-
-        valid_priorities = ["low", "medium", "high", "critical"]
-        if priority.lower() not in valid_priorities:
-            raise ValueError(f"Priority must be one of: {valid_priorities}")
+        if len(description) > 5000:
+            raise ValueError("Description too long (max 5000 characters)")
 
         # Generate new ticket ID
         ticket_count = len(self.tickets_db) + 1
@@ -314,7 +323,7 @@ class MockTicketAPI:
 
 # Global instance for easy access
 _global_api = None
-
+_api_lock = threading.Lock()
 
 def get_ticket_api() -> MockTicketAPI:
     """
@@ -322,7 +331,9 @@ def get_ticket_api() -> MockTicketAPI:
     """
     global _global_api
     if _global_api is None:
-        _global_api = MockTicketAPI()
+        with _api_lock:
+            if _global_api is None:
+                _global_api = MockTicketAPI()
     return _global_api
 
 
