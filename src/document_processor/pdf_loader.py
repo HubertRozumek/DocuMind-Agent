@@ -1,17 +1,21 @@
-import os
 import logging
-from typing import List, Dict, Any
+import os
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
 try:
-    from langchain_community.document_loaders import PyPDFLoader, UnstructuredPDFLoader, PyMuPDFLoader
+    from langchain_community.document_loaders import (
+        PyMuPDFLoader,
+        PyPDFLoader,
+        UnstructuredPDFLoader,
+    )
+
     LANGCHAIN_AVAILABLE = True
 except ImportError:
     LANGCHAIN_AVAILABLE = False
     logger.warning(
-        "LangChain not available. Install with: "
-        "pip install langchain langchain-community"
+        "LangChain not available. Install with: " "pip install langchain langchain-community"
     )
 
 
@@ -27,11 +31,7 @@ class PDFLoader:
     - Much better than pdfplumber for complex PDFs
     """
 
-    def __init__(
-        self,
-        loader_type: str = "auto",
-        extract_images: bool = False
-    ):
+    def __init__(self, loader_type: str = "auto", extract_images: bool = False):
         """
         Initialize PDF loader.
 
@@ -41,8 +41,7 @@ class PDFLoader:
         """
         if not LANGCHAIN_AVAILABLE:
             raise ImportError(
-                "LangChain is required. Install with: "
-                "pip install langchain langchain-community"
+                "LangChain is required. Install with: " "pip install langchain langchain-community"
             )
 
         self.loader_type = loader_type
@@ -84,15 +83,9 @@ class PDFLoader:
         # Convert to our format
         result = []
         for doc in documents:
-            result.append({
-                "text": doc.page_content,
-                "metadata": doc.metadata
-            })
+            result.append({"text": doc.page_content, "metadata": doc.metadata})
 
-        logger.info(
-            f"Loaded {os.path.basename(filepath)}: "
-            f"{len(result)} pages/chunks"
-        )
+        logger.info(f"Loaded {os.path.basename(filepath)}: " f"{len(result)} pages/chunks")
 
         return result
 
@@ -104,7 +97,7 @@ class PDFLoader:
         if not os.path.isfile(filepath):
             raise ValueError(f"Not a file: {filepath}")
 
-        if not filepath.lower().endswith('.pdf'):
+        if not filepath.lower().endswith(".pdf"):
             raise ValueError(f"Not a PDF file: {filepath}")
 
         # Check size (max 500MB)
@@ -143,8 +136,7 @@ class PDFLoader:
         """
         try:
             loader = UnstructuredPDFLoader(
-                filepath,
-                mode="elements" if self.extract_images else "single"
+                filepath, mode="elements" if self.extract_images else "single"
             )
             documents = loader.load()
             logger.info(f"Loaded with Unstructured: {len(documents)} elements")
@@ -187,14 +179,14 @@ class PDFLoader:
             return self._load_with_pymupdf(filepath)
         except Exception as e:
             errors.append(f"PyMuPDF: {e}")
-            logger.warning(f"PyMuPDF failed, trying Unstructured...")
+            logger.warning("PyMuPDF failed, trying Unstructured...")
 
         # Try Unstructured
         try:
             return self._load_with_unstructured(filepath)
         except Exception as e:
             errors.append(f"Unstructured: {e}")
-            logger.warning(f"Unstructured failed, trying PyPDF...")
+            logger.warning("Unstructured failed, trying PyPDF...")
 
         # Try PyPDF as last resort
         try:
@@ -236,11 +228,7 @@ class DocumentProcessor:
     Batch document processor for directories.
     """
 
-    def __init__(
-        self,
-        data_dir: str = "data/raw_documents",
-        loader_type: str = "auto"
-    ):
+    def __init__(self, data_dir: str = "data/raw_documents", loader_type: str = "auto"):
         """
         Initialize processor.
 
@@ -261,7 +249,7 @@ class DocumentProcessor:
 
         pdf_files = []
         for file in os.listdir(self.data_dir):
-            if file.lower().endswith('.pdf'):
+            if file.lower().endswith(".pdf"):
                 pdf_files.append(os.path.join(self.data_dir, file))
 
         return sorted(pdf_files)

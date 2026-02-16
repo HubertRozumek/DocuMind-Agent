@@ -1,7 +1,9 @@
 import logging
+
+from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
 from langchain_ollama import OllamaLLM
-from langchain_core.output_parsers import StrOutputParser
+
 from src.agent.graph_state import GraphState, StateManager
 
 logger = logging.getLogger(__name__)
@@ -48,20 +50,19 @@ class QueryRewriter:
         return PromptTemplate(template=template, input_variables=["question", "search_history"])
 
     def rewrite_question(self, state: GraphState) -> GraphState:
-        """
-        """
+        """ """
         logger.info(f"Rewriting question: {state['question']}")
 
         search_history = state.get("search_history", [])
         history_text = "\n".join(search_history[-3:]) if search_history else "No history"
 
-        rewritten_questions_text = self.chain.invoke({
-            "question": state["question"],
-            "search_history": history_text
-        })
+        rewritten_questions_text = self.chain.invoke(
+            {"question": state["question"], "search_history": history_text}
+        )
 
         rewritten_questions = [
-            q.strip() for q in rewritten_questions_text.split("\n")
+            q.strip()
+            for q in rewritten_questions_text.split("\n")
             if q.strip() and q.strip().lower() != state["question"].lower()
         ]
 
@@ -72,7 +73,7 @@ class QueryRewriter:
             rewritten_questions = [
                 f"procedure {base_question}",
                 f"policy regarding {base_question}",
-                f"{base_question} documentation"
+                f"{base_question} documentation",
             ]
 
         logger.info(f"Generated {len(rewritten_questions)} rewrites: {rewritten_questions}")
@@ -86,22 +87,26 @@ class QueryRewriter:
                 **state.get("metadata", {}),
                 "rewrite_action": "query_rewritten",
                 "original_question": state["question"],
-                "rewritten_count": len(rewritten_questions)
-            }
+                "rewritten_count": len(rewritten_questions),
+            },
         )
 
         # Add to decision log
         decision_log = updated_state.get("decision_log", [])
-        decision_log.append({
-            "step": "query_rewriter",
-            "original_question": state["question"],
-            "rewritten_questions": rewritten_questions,
-            "iteration": updated_state["iterations"]
-        })
+        decision_log.append(
+            {
+                "step": "query_rewriter",
+                "original_question": state["question"],
+                "rewritten_questions": rewritten_questions,
+                "iteration": updated_state["iterations"],
+            }
+        )
         updated_state["decision_log"] = decision_log
 
         logger.info(f"Rewrite complete. State keys: {list(updated_state.keys())}")
-        logger.info(f"rewritten_questions in state: {len(updated_state.get('rewritten_questions', []))}")
+        logger.info(
+            f"rewritten_questions in state: {len(updated_state.get('rewritten_questions', []))}"
+        )
 
         return updated_state
 

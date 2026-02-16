@@ -5,15 +5,17 @@ Tests PDF loading functionality with dynamic PDF creation,
 fallback mechanisms, validation, and error handling.
 """
 
-import pytest
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import pytest
 
 # Add src to path (adjust based on your structure)
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 # ==================== BASIC LOADING TESTS ====================
+
 
 def test_pdf_loader_initialization():
     """Test PDFLoader can be initialized with different configs."""
@@ -90,6 +92,7 @@ def test_load_pdf_with_special_characters(create_test_pdf):
     # Basic check that content was loaded
     assert len(documents[0]["text"]) > 0
 
+
 def test_validate_nonexistent_file():
     """Test that loading nonexistent file raises error."""
     from src.document_processor.pdf_loader import PDFLoader
@@ -126,6 +129,7 @@ def test_validate_directory_path(temp_dir):
 
 # ==================== LOADER TYPE TESTS ====================
 
+
 @pytest.mark.parametrize("loader_type", ["pymupdf"])
 def test_different_loader_types(create_test_pdf, loader_type):
     """Test that different loader types work."""
@@ -152,7 +156,9 @@ def test_auto_loader_fallback(create_test_pdf):
 
     assert len(documents) >= 1
 
+
 # ==================== METADATA TESTS ====================
+
 
 def test_metadata_preservation(create_test_pdf):
     """Test that metadata is properly preserved."""
@@ -187,6 +193,7 @@ def test_page_numbering(create_test_pdf):
 
 
 # ==================== MULTIPLE FILES TESTS ====================
+
 
 def test_load_multiple_pdfs(multiple_pdfs):
     """Test loading multiple PDF files."""
@@ -223,6 +230,7 @@ def test_load_multiple_with_failures(multiple_pdfs, temp_dir):
 
 # ==================== DOCUMENT PROCESSOR TESTS ====================
 
+
 def test_document_processor_initialization(temp_dir):
     """Test DocumentProcessor initialization."""
     from src.document_processor.pdf_loader import DocumentProcessor
@@ -252,6 +260,7 @@ def test_get_all_pdfs_with_files(temp_dir, create_test_pdf):
 
     # Move to temp_dir
     import shutil
+
     shutil.move(str(pdf1), str(temp_dir / "doc1.pdf"))
     shutil.move(str(pdf2), str(temp_dir / "doc2.pdf"))
 
@@ -259,7 +268,7 @@ def test_get_all_pdfs_with_files(temp_dir, create_test_pdf):
     pdfs = processor.get_all_pdfs()
 
     assert len(pdfs) == 2
-    assert all(p.endswith('.pdf') for p in pdfs)
+    assert all(p.endswith(".pdf") for p in pdfs)
 
 
 def test_process_all_documents(temp_dir, create_test_pdf):
@@ -271,6 +280,7 @@ def test_process_all_documents(temp_dir, create_test_pdf):
     pdf2 = create_test_pdf("Document 2", num_pages=2, filename="test2.pdf")
 
     import shutil
+
     shutil.move(str(pdf1), str(temp_dir / "test1.pdf"))
     shutil.move(str(pdf2), str(temp_dir / "test2.pdf"))
 
@@ -281,7 +291,9 @@ def test_process_all_documents(temp_dir, create_test_pdf):
     assert "test1.pdf" in results
     assert "test2.pdf" in results
 
+
 # ==================== EDGE CASES ====================
+
 
 def test_empty_pdf_handling(create_test_pdf):
     """Test handling of PDF with minimal content."""
@@ -309,6 +321,7 @@ def test_pdf_with_only_whitespace(create_test_pdf):
 
 
 # ==================== PERFORMANCE TESTS ====================
+
 
 def test_loading_performance(create_test_pdf, performance_timer):
     """Test that PDF loading completes in reasonable time."""
@@ -344,6 +357,7 @@ def test_batch_loading_performance(multiple_pdfs, performance_timer):
 
 # ==================== INTEGRATION TESTS ====================
 
+
 def test_pdf_to_text_pipeline(create_test_pdf):
     """Test complete PDF loading pipeline."""
     from src.document_processor.pdf_loader import PDFLoader
@@ -370,8 +384,7 @@ def test_pdf_to_text_pipeline(create_test_pdf):
 
     # Verify complete pipeline
     assert len(documents) == 2
-    assert all("INTRODUCTION" in doc["text"] or "Key Points" in doc["text"]
-               for doc in documents)
+    assert all("INTRODUCTION" in doc["text"] or "Key Points" in doc["text"] for doc in documents)
     assert all("metadata" in doc for doc in documents)
     assert all(doc["metadata"]["source"] == str(pdf_path) for doc in documents)
 

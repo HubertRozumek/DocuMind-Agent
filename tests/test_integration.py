@@ -5,17 +5,21 @@ Tests complete RAG pipeline from PDF loading through
 text splitting, embedding, retrieval, grading, and answer generation.
 """
 
-import pytest
-from pathlib import Path
 import sys
+from pathlib import Path
 from unittest.mock import Mock, patch
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 # ==================== FULL PIPELINE TESTS ====================
 
-def test_pdf_to_vector_store_pipeline(create_test_pdf, vector_store_config, mock_embedding_function):
+
+def test_pdf_to_vector_store_pipeline(
+    create_test_pdf, vector_store_config, mock_embedding_function
+):
     """Test complete pipeline: PDF -> Chunks -> Vector Store."""
     from src.document_processor.pdf_loader import PDFLoader
     from src.document_processor.text_splitter import TextSplitter
@@ -24,11 +28,11 @@ def test_pdf_to_vector_store_pipeline(create_test_pdf, vector_store_config, mock
     # 1. Load PDF
     content = """
     Machine Learning Introduction
-    
+
     Machine learning is a method of data analysis that automates analytical
     model building. It is a branch of artificial intelligence based on the idea
     that systems can learn from data, identify patterns and make decisions.
-    
+
     Key Concepts:
     - Supervised learning uses labeled data
     - Unsupervised learning finds hidden patterns
@@ -53,17 +57,13 @@ def test_pdf_to_vector_store_pipeline(create_test_pdf, vector_store_config, mock
         collection_name=vector_store_config["collection_name"],
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
-        reset_on_start=True
+        reset_on_start=True,
     )
 
     # Convert chunks to documents format
     docs_to_add = []
     for i, chunk in enumerate(chunks):
-        docs_to_add.append({
-            "id": chunk.chunk_id,
-            "text": chunk.text,
-            "metadata": chunk.metadata
-        })
+        docs_to_add.append({"id": chunk.chunk_id, "text": chunk.text, "metadata": chunk.metadata})
 
     count = vector_store.add_documents(docs_to_add)
 
@@ -72,47 +72,46 @@ def test_pdf_to_vector_store_pipeline(create_test_pdf, vector_store_config, mock
 
 def test_retrieval_pipeline(vector_store_config, mock_embedding_function):
     """Test retrieval pipeline with search."""
-    from src.vector_store.chroma_db import ChromaDBVectorStore
-    from src.agent.nodes.retriever_node import RetrieverNode
     from src.agent.graph_state import GraphState
+    from src.agent.nodes.retriever_node import RetrieverNode
+    from src.vector_store.chroma_db import ChromaDBVectorStore
 
     # Setup vector store with documents
     vector_store = ChromaDBVectorStore(
         collection_name=vector_store_config["collection_name"],
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
-        reset_on_start=True
+        reset_on_start=True,
     )
 
     docs = [
         {
             "id": "1",
             "text": "Python is a high-level programming language known for its simplicity.",
-            "metadata": {"topic": "programming"}
+            "metadata": {"topic": "programming"},
         },
         {
             "id": "2",
             "text": "Machine learning models require training data to learn patterns.",
-            "metadata": {"topic": "ml"}
+            "metadata": {"topic": "ml"},
         },
         {
             "id": "3",
             "text": "Neural networks are inspired by biological neural networks.",
-            "metadata": {"topic": "ml"}
+            "metadata": {"topic": "ml"},
         },
         {
             "id": "4",
             "text": "Data preprocessing is crucial for machine learning success.",
-            "metadata": {"topic": "ml"}
-        }
+            "metadata": {"topic": "ml"},
+        },
     ]
 
     vector_store.add_documents(docs)
 
     # Create retriever
     retriever = RetrieverNode(
-        vector_store=vector_store,
-        search_config={"k": 3, "score_threshold": 0.5}
+        vector_store=vector_store, search_config={"k": 3, "score_threshold": 0.5}
     )
 
     # Create state
@@ -126,7 +125,7 @@ def test_retrieval_pipeline(vector_store_config, mock_embedding_function):
         needs_rewrite=False,
         confidence=0.0,
         history=[],
-        metadata={}
+        metadata={},
     )
 
     # Retrieve using runnable
@@ -139,24 +138,24 @@ def test_retrieval_pipeline(vector_store_config, mock_embedding_function):
 
 def test_retrieval_and_grading_pipeline(vector_store_config, mock_embedding_function):
     """Test retrieval followed by grading."""
-    from src.vector_store.chroma_db import ChromaDBVectorStore
-    from src.agent.nodes.retriever_node import RetrieverNode
-    from src.agent.nodes.grader_node import GraderNode
-    from src.agent.nodes.robust_grader import GradingResult, RelevanceScore
     from src.agent.graph_state import GraphState
+    from src.agent.nodes.grader_node import GraderNode
+    from src.agent.nodes.retriever_node import RetrieverNode
+    from src.agent.nodes.robust_grader import GradingResult, RelevanceScore
+    from src.vector_store.chroma_db import ChromaDBVectorStore
 
     # Setup vector store
     vector_store = ChromaDBVectorStore(
         collection_name=vector_store_config["collection_name"],
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
-        reset_on_start=True
+        reset_on_start=True,
     )
 
     docs = [
         {"id": "1", "text": "Python is a programming language", "metadata": {}},
         {"id": "2", "text": "Machine learning uses Python", "metadata": {}},
-        {"id": "3", "text": "The weather is sunny today", "metadata": {}}
+        {"id": "3", "text": "The weather is sunny today", "metadata": {}},
     ]
     vector_store.add_documents(docs)
 
@@ -175,7 +174,7 @@ def test_retrieval_and_grading_pipeline(vector_store_config, mock_embedding_func
         needs_rewrite=False,
         confidence=0.0,
         history=[],
-        metadata={}
+        metadata={},
     )
 
     # Step 1: Retrieve
@@ -190,7 +189,7 @@ def test_retrieval_and_grading_pipeline(vector_store_config, mock_embedding_func
         for _ in range(len(state["documents"]))
     ]
 
-    with patch.object(grader.grader, 'grade_batch', return_value=mock_results):
+    with patch.object(grader.grader, "grade_batch", return_value=mock_results):
         grader_runnable = grader.as_runnable()
         state = grader_runnable.invoke(state)
 
@@ -199,6 +198,7 @@ def test_retrieval_and_grading_pipeline(vector_store_config, mock_embedding_func
 
 
 # ==================== MULTI-DOCUMENT TESTS ====================
+
 
 def test_multi_document_processing(multiple_pdfs, vector_store_config, mock_embedding_function):
     """Test processing multiple PDFs through pipeline."""
@@ -227,7 +227,7 @@ def test_multi_document_processing(multiple_pdfs, vector_store_config, mock_embe
         collection_name=vector_store_config["collection_name"],
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
-        reset_on_start=True
+        reset_on_start=True,
     )
 
     docs_to_add = [
@@ -242,18 +242,19 @@ def test_multi_document_processing(multiple_pdfs, vector_store_config, mock_embe
 
 # ==================== ERROR RECOVERY TESTS ====================
 
+
 def test_pipeline_handles_empty_results(vector_store_config, mock_embedding_function):
     """Test pipeline handles empty search results."""
-    from src.vector_store.chroma_db import ChromaDBVectorStore
-    from src.agent.nodes.retriever_node import RetrieverNode
     from src.agent.graph_state import GraphState
+    from src.agent.nodes.retriever_node import RetrieverNode
+    from src.vector_store.chroma_db import ChromaDBVectorStore
 
     # Empty vector store
     vector_store = ChromaDBVectorStore(
         collection_name=vector_store_config["collection_name"],
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
-        reset_on_start=True
+        reset_on_start=True,
     )
 
     retriever = RetrieverNode(vector_store=vector_store)
@@ -268,7 +269,7 @@ def test_pipeline_handles_empty_results(vector_store_config, mock_embedding_func
         needs_rewrite=False,
         confidence=0.0,
         history=[],
-        metadata={}
+        metadata={},
     )
 
     runnable = retriever.as_runnable()
@@ -281,8 +282,8 @@ def test_pipeline_handles_empty_results(vector_store_config, mock_embedding_func
 
 def test_grader_handles_empty_documents():
     """Test grader handles empty document list."""
-    from src.agent.nodes.grader_node import GraderNode
     from src.agent.graph_state import GraphState
+    from src.agent.nodes.grader_node import GraderNode
 
     grader = GraderNode()
 
@@ -296,7 +297,7 @@ def test_grader_handles_empty_documents():
         needs_rewrite=False,
         confidence=0.0,
         history=[],
-        metadata={}
+        metadata={},
     )
 
     runnable = grader.as_runnable()
@@ -308,14 +309,16 @@ def test_grader_handles_empty_documents():
 
 # ==================== PERFORMANCE TESTS ====================
 
-def test_full_pipeline_performance(create_test_pdf, vector_store_config,
-                                   mock_embedding_function, performance_timer):
+
+def test_full_pipeline_performance(
+    create_test_pdf, vector_store_config, mock_embedding_function, performance_timer
+):
     """Test full pipeline performance."""
+    from src.agent.graph_state import GraphState
+    from src.agent.nodes.retriever_node import RetrieverNode
     from src.document_processor.pdf_loader import PDFLoader
     from src.document_processor.text_splitter import TextSplitter
     from src.vector_store.chroma_db import ChromaDBVectorStore
-    from src.agent.nodes.retriever_node import RetrieverNode
-    from src.agent.graph_state import GraphState
 
     # Create moderate-sized document
     content = "Test content paragraph. " * 100
@@ -335,7 +338,7 @@ def test_full_pipeline_performance(create_test_pdf, vector_store_config,
             collection_name=vector_store_config["collection_name"],
             persist_directory=vector_store_config["persist_directory"],
             embedding_function=mock_embedding_function,
-            reset_on_start=True
+            reset_on_start=True,
         )
 
         docs_to_add = [
@@ -356,7 +359,7 @@ def test_full_pipeline_performance(create_test_pdf, vector_store_config,
             needs_rewrite=False,
             confidence=0.0,
             history=[],
-            metadata={}
+            metadata={},
         )
         runnable = retriever.as_runnable()
         runnable.invoke(state)
@@ -367,8 +370,10 @@ def test_full_pipeline_performance(create_test_pdf, vector_store_config,
 
 # ==================== DATA CONSISTENCY TESTS ====================
 
-def test_metadata_consistency_through_pipeline(create_test_pdf, vector_store_config,
-                                               mock_embedding_function):
+
+def test_metadata_consistency_through_pipeline(
+    create_test_pdf, vector_store_config, mock_embedding_function
+):
     """Test that metadata is preserved through entire pipeline."""
     from src.document_processor.pdf_loader import PDFLoader
     from src.document_processor.text_splitter import TextSplitter
@@ -380,10 +385,8 @@ def test_metadata_consistency_through_pipeline(create_test_pdf, vector_store_con
     loader = PDFLoader()
     documents = loader.load_pdf(str(pdf_path))
 
-    original_source = documents[0]["metadata"]["source"]
-
     # Split (preserves metadata)
-    splitter = TextSplitter(chunk_size=100,chunk_overlap=20)
+    splitter = TextSplitter(chunk_size=100, chunk_overlap=20)
     chunks = splitter.split_documents(documents)
 
     # Verify metadata in chunks
@@ -394,12 +397,11 @@ def test_metadata_consistency_through_pipeline(create_test_pdf, vector_store_con
         collection_name=vector_store_config["collection_name"],
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
-        reset_on_start=True
+        reset_on_start=True,
     )
 
     docs_to_add = [
-        {"id": chunk.chunk_id, "text": chunk.text, "metadata": chunk.metadata}
-        for chunk in chunks
+        {"id": chunk.chunk_id, "text": chunk.text, "metadata": chunk.metadata} for chunk in chunks
     ]
     vector_store.add_documents(docs_to_add)
 
@@ -412,6 +414,7 @@ def test_metadata_consistency_through_pipeline(create_test_pdf, vector_store_con
 
 # ==================== STRESS TESTS ====================
 
+
 def test_large_batch_processing(vector_store_config, mock_embedding_function, performance_timer):
     """Test processing large batch of documents."""
     from src.vector_store.chroma_db import ChromaDBVectorStore
@@ -420,7 +423,7 @@ def test_large_batch_processing(vector_store_config, mock_embedding_function, pe
         collection_name=vector_store_config["collection_name"],
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
-        reset_on_start=True
+        reset_on_start=True,
     )
 
     # Create 500 documents
@@ -428,7 +431,7 @@ def test_large_batch_processing(vector_store_config, mock_embedding_function, pe
         {
             "id": str(i),
             "text": f"Document {i} with content about topic {i % 20}",
-            "metadata": {"index": i, "topic": i % 20}
+            "metadata": {"index": i, "topic": i % 20},
         }
         for i in range(500)
     ]
@@ -442,6 +445,7 @@ def test_large_batch_processing(vector_store_config, mock_embedding_function, pe
 
 # ==================== RECOVERY TESTS ====================
 
+
 def test_pipeline_recovery_after_failure(vector_store_config, mock_embedding_function):
     """Test that pipeline can recover after component failure."""
     from src.vector_store.chroma_db import ChromaDBVectorStore
@@ -450,7 +454,7 @@ def test_pipeline_recovery_after_failure(vector_store_config, mock_embedding_fun
         collection_name=vector_store_config["collection_name"],
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
-        reset_on_start=True
+        reset_on_start=True,
     )
 
     # Add some documents
@@ -462,7 +466,7 @@ def test_pipeline_recovery_after_failure(vector_store_config, mock_embedding_fun
         # Force an error (documents without text)
         bad_docs = [{"id": "2", "metadata": {}}]
         vector_store.add_documents(bad_docs)
-    except:
+    except Exception:
         pass
 
     # Should still work after error
@@ -473,9 +477,9 @@ def test_pipeline_recovery_after_failure(vector_store_config, mock_embedding_fun
 
 def test_retriever_with_various_query_types():
     """Test retriever handles different query types."""
+
     from src.agent.nodes.retriever_node import RetrieverNode
     from src.vector_store.chroma_db import ChromaDBVectorStore
-    from unittest.mock import Mock
 
     # Mock vector store
     mock_store = Mock(spec=ChromaDBVectorStore)
@@ -485,7 +489,7 @@ def test_retriever_with_various_query_types():
         "metadatas": [{}],
         "distances": [0.5],
         "similarities": [0.5],
-        "query": "test"
+        "query": "test",
     }
 
     retriever = RetrieverNode(vector_store=mock_store)
@@ -496,7 +500,7 @@ def test_retriever_with_various_query_types():
         "How to learn machine learning?",
         "Python vs Java comparison",
         "Short",
-        "Very long query with many words to test preprocessing and truncation behavior"
+        "Very long query with many words to test preprocessing and truncation behavior",
     ]
 
     for query in queries:

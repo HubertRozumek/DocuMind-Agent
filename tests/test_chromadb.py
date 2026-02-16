@@ -5,24 +5,28 @@ Tests vector store operations including initialization,
 document addition, search, persistence, and cleanup.
 """
 
-import pytest
-from pathlib import Path
 import sys
+from pathlib import Path
+
 import chromadb
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 # ==================== INITIALIZATION TESTS ====================
 
+
 def test_chromadb_initialization(vector_store_config, mock_embedding_function):
     """Test ChromaDB initialization."""
     from src.vector_store.chroma_db import ChromaDBVectorStore
+
     store = ChromaDBVectorStore(
         collection_name=vector_store_config["collection_name"],
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
         reset_on_start=True,
-        client=chromadb.PersistentClient(path=str(vector_store_config["persist_directory"]))
+        client=chromadb.PersistentClient(path=str(vector_store_config["persist_directory"])),
     )
 
     assert store.collection_name == vector_store_config["collection_name"]
@@ -40,14 +44,9 @@ def test_chromadb_with_reset(vector_store_config, mock_embedding_function):
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
         reset_on_start=True,
-        client=chromadb.PersistentClient(path=str(vector_store_config["persist_directory"]))
+        client=chromadb.PersistentClient(path=str(vector_store_config["persist_directory"])),
     )
-    docs_to_add = [
-        {
-            "id": "01",
-            "text": "text",
-            "metadata": {}
-        }]
+    docs_to_add = [{"id": "01", "text": "text", "metadata": {}}]
     # Add some data
     store1.add_documents(docs_to_add)
 
@@ -57,7 +56,7 @@ def test_chromadb_with_reset(vector_store_config, mock_embedding_function):
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
         reset_on_start=True,
-        client=chromadb.PersistentClient(path=str(vector_store_config["persist_directory"]))
+        client=chromadb.PersistentClient(path=str(vector_store_config["persist_directory"])),
     )
 
     # Collection should be empty
@@ -75,15 +74,10 @@ def test_chromadb_without_reset(vector_store_config, mock_embedding_function):
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
         reset_on_start=False,
-        client=chromadb.PersistentClient(path=str(vector_store_config["persist_directory"]))
+        client=chromadb.PersistentClient(path=str(vector_store_config["persist_directory"])),
     )
 
-    docs_to_add = [
-        {
-            "id": "01",
-            "text": "text",
-            "metadata": {}
-        }]
+    docs_to_add = [{"id": "01", "text": "text", "metadata": {}}]
     # Add some data
     store1.add_documents(docs_to_add)
 
@@ -95,7 +89,7 @@ def test_chromadb_without_reset(vector_store_config, mock_embedding_function):
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
         reset_on_start=False,
-        client=chromadb.PersistentClient(path=str(vector_store_config["persist_directory"]))
+        client=chromadb.PersistentClient(path=str(vector_store_config["persist_directory"])),
     )
 
     # Should have same count
@@ -103,6 +97,7 @@ def test_chromadb_without_reset(vector_store_config, mock_embedding_function):
 
 
 # ==================== ADD OPERATIONS TESTS ====================
+
 
 def test_add_single_text(vector_store_config, mock_embedding_function):
     """Test adding single text."""
@@ -113,15 +108,10 @@ def test_add_single_text(vector_store_config, mock_embedding_function):
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
         reset_on_start=True,
-        client=chromadb.PersistentClient(path=str(vector_store_config["persist_directory"]))
+        client=chromadb.PersistentClient(path=str(vector_store_config["persist_directory"])),
     )
 
-    docs_to_add = [
-        {
-            "id": "01",
-            "text": "text",
-            "metadata": {}
-        }]
+    docs_to_add = [{"id": "01", "text": "text", "metadata": {}}]
     # Add some data
     store.add_documents(docs_to_add)
 
@@ -140,20 +130,13 @@ def test_add_multiple_texts(vector_store_config, mock_embedding_function):
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
         reset_on_start=True,
-        client=chromadb.PersistentClient(path=str(vector_store_config["persist_directory"]))
+        client=chromadb.PersistentClient(path=str(vector_store_config["persist_directory"])),
     )
 
     docs_to_add = [
-        {
-            "id": "01",
-            "text": "text",
-            "metadata": {}
-        },
-        {
-            "id": "02",
-            "text": "text",
-            "metadata": {}
-        }]
+        {"id": "01", "text": "text", "metadata": {}},
+        {"id": "02", "text": "text", "metadata": {}},
+    ]
     # Add some data
     store.add_documents(docs_to_add)
 
@@ -172,15 +155,10 @@ def test_add_texts_without_metadata(vector_store_config, mock_embedding_function
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
         reset_on_start=True,
-        client=chromadb.PersistentClient(path=str(vector_store_config["persist_directory"]))
+        client=chromadb.PersistentClient(path=str(vector_store_config["persist_directory"])),
     )
 
-    docs_to_add = [
-        {
-            "id": "01",
-            "text": "text",
-            "metadata": {}
-        }]
+    docs_to_add = [{"id": "01", "text": "text", "metadata": {}}]
     store.add_documents(docs_to_add)
 
     stats = store.get_collection_stats()
@@ -189,6 +167,7 @@ def test_add_texts_without_metadata(vector_store_config, mock_embedding_function
 
 
 # ==================== SEARCH TESTS ====================
+
 
 def test_similarity_search(vector_store_config, mock_embedding_function):
     """Test similarity search."""
@@ -199,25 +178,20 @@ def test_similarity_search(vector_store_config, mock_embedding_function):
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
         reset_on_start=True,
-        client=chromadb.PersistentClient(path=str(vector_store_config["persist_directory"]))
+        client=chromadb.PersistentClient(path=str(vector_store_config["persist_directory"])),
     )
 
     # Add documents
     texts = [
         "Python is a programming language",
         "Machine learning uses Python",
-        "The weather is nice today"
+        "The weather is nice today",
     ]
-    docs_to_add = [
-        {
-            "id": i,
-            "text": t,
-            "metadata": {}
-        } for i in range(len(texts)) for t in texts]
+    docs_to_add = [{"id": i, "text": t, "metadata": {}} for i in range(len(texts)) for t in texts]
 
     store.add_documents(docs_to_add)
     # Search
-    results = store.search(query="Python programming",n_results=2)
+    results = store.search(query="Python programming", n_results=2)
 
     assert len(results.get("ids")) <= 2
 
@@ -231,14 +205,16 @@ def test_search_empty_collection(vector_store_config, mock_embedding_function):
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
         reset_on_start=True,
-        client=None
+        client=None,
     )
 
     results = store.search(query="test", n_results=5)
 
     assert len(results.get("ids")) == 0
 
+
 # ==================== METADATA TESTS ====================
+
 
 def test_search_returns_expected_structure(vector_store_config, mock_embedding_function):
     from src.vector_store.chroma_db import ChromaDBVectorStore
@@ -248,12 +224,10 @@ def test_search_returns_expected_structure(vector_store_config, mock_embedding_f
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
         reset_on_start=True,
-        client=None
+        client=None,
     )
 
-    store.add_documents([
-        {"id": "1", "text": "hello world", "metadata": {"a": 1}}
-    ])
+    store.add_documents([{"id": "1", "text": "hello world", "metadata": {"a": 1}}])
 
     results = store.search("hello")
 
@@ -263,7 +237,9 @@ def test_search_returns_expected_structure(vector_store_config, mock_embedding_f
     assert "distances" in results
     assert "similarities" in results
 
+
 # ==================== PERFORMANCE TESTS ====================
+
 
 def test_add_performance(vector_store_config, mock_embedding_function, performance_timer):
     from src.vector_store.chroma_db import ChromaDBVectorStore
@@ -273,13 +249,10 @@ def test_add_performance(vector_store_config, mock_embedding_function, performan
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
         reset_on_start=True,
-        client=None
+        client=None,
     )
 
-    docs = [
-        {"id": str(i), "text": f"text {i}", "metadata": {}}
-        for i in range(100)
-    ]
+    docs = [{"id": str(i), "text": f"text {i}", "metadata": {}} for i in range(100)]
 
     with performance_timer() as timer:
         store.add_documents(docs)
@@ -295,13 +268,10 @@ def test_search_performance(vector_store_config, mock_embedding_function, perfor
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
         reset_on_start=True,
-        client=None
+        client=None,
     )
 
-    docs = [
-        {"id": str(i), "text": f"topic {i%5}", "metadata": {}}
-        for i in range(300)
-    ]
+    docs = [{"id": str(i), "text": f"topic {i%5}", "metadata": {}} for i in range(300)]
 
     store.add_documents(docs)
 
@@ -310,6 +280,7 @@ def test_search_performance(vector_store_config, mock_embedding_function, perfor
 
     assert timer.elapsed < 1.0
     assert len(results["ids"]) <= 5
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -1,8 +1,9 @@
-from typing import Dict, Any, Optional, Callable
-from langchain_core.runnables import RunnableLambda
-import numpy as np
 import logging
 from datetime import datetime
+from typing import Any, Callable, Dict, Optional
+
+import numpy as np
+from langchain_core.runnables import RunnableLambda
 
 from ..graph_state import GraphState
 
@@ -24,10 +25,9 @@ class RetrieverNode:
         _cache_max_size: Maximum cache size for query preprocessing
     """
 
-    def __init__(self,
-                 vector_store,
-                 embedding_model=None,
-                 search_config: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self, vector_store, embedding_model=None, search_config: Optional[Dict[str, Any]] = None
+    ):
         """
         Initialize the retriever node.
 
@@ -48,7 +48,7 @@ class RetrieverNode:
         self._query_cache = {}
         self._cache_max_size = 100
 
-        logger.info(f"Initializing retriever node")
+        logger.info("Initializing retriever node")
         logger.info(f"Search config: {self.search_config}")
 
     def _default_search_config(self) -> Dict[str, Any]:
@@ -60,12 +60,10 @@ class RetrieverNode:
             "include_metadata": True,
             "include_embeddings": False,
             "rerank": False,
-            "diversity": False
+            "diversity": False,
         }
 
-    def retrieve(self,
-                 query: str,
-                 state: Optional[GraphState] = None) -> Dict[str, Any]:
+    def retrieve(self, query: str, state: Optional[GraphState] = None) -> Dict[str, Any]:
         """
         Execute document retrieval pipeline.
 
@@ -136,7 +134,7 @@ class RetrieverNode:
         cache_key = self._create_cache_key(query, state)
 
         if cache_key in self._query_cache:
-            logger.debug(f"Using cached preprocessed query")
+            logger.debug("Using cached preprocessed query")
             return self._query_cache[cache_key]
 
         enriched_parts = []
@@ -146,17 +144,21 @@ class RetrieverNode:
 
         if rewritten_questions and current_rewrite_index < len(rewritten_questions):
             current_rewrite = rewritten_questions[current_rewrite_index]
-            if current_rewrite and current_rewrite.strip() and current_rewrite.lower() != query.lower():
+            if (
+                current_rewrite
+                and current_rewrite.strip()
+                and current_rewrite.lower() != query.lower()
+            ):
                 enriched_parts.append(current_rewrite.strip())
-                logger.info(f"[Query Preprocessing] Using rewrite #{current_rewrite_index}: {current_rewrite[:50]}...")
+                logger.info(
+                    f"[Query Preprocessing] Using rewrite #{current_rewrite_index}: {current_rewrite[:50]}..."
+                )
 
         enriched_parts.append(query)
 
         history = state.get("history", [])
         user_turns = [
-            h["content"].strip()
-            for h in history
-            if h.get("role") == "user" and h.get("content")
+            h["content"].strip() for h in history if h.get("role") == "user" and h.get("content")
         ]
 
         context_turns = user_turns[-2:-1]
@@ -228,9 +230,7 @@ class RetrieverNode:
 
         try:
             results = self.vector_store.search(
-                query=query,
-                n_results=search_kwargs["k"],
-                where=search_kwargs.get("where")
+                query=query, n_results=search_kwargs["k"], where=search_kwargs.get("where")
             )
 
             processed = {
@@ -255,7 +255,7 @@ class RetrieverNode:
             "ids": [],
             "distances": [],
             "similarities": [],
-            "query": query
+            "query": query,
         }
 
     def _filter_results(self, results: Dict[str, Any]) -> Dict[str, Any]:
@@ -278,15 +278,15 @@ class RetrieverNode:
             return self._empty_results(results.get("query", ""))
 
         filtered_indices = [
-            i for i, similarity in enumerate(results["similarities"])
-            if similarity >= threshold
+            i for i, similarity in enumerate(results["similarities"]) if similarity >= threshold
         ]
 
         if not filtered_indices:
             logger.warning(f"No documents above threshold {threshold}")
 
             valid_docs = [
-                (i, sim) for i, sim in enumerate(results["similarities"])
+                (i, sim)
+                for i, sim in enumerate(results["similarities"])
                 if sim >= ABSOLUTE_MIN_SIMILARITY
             ]
 
@@ -301,18 +301,29 @@ class RetrieverNode:
 
         filtered_results = {
             "documents": [results["documents"][i] for i in filtered_indices],
-            "metadatas": [results["metadatas"][i] for i in filtered_indices] if results.get("metadatas") else [],
+            "metadatas": (
+                [results["metadatas"][i] for i in filtered_indices]
+                if results.get("metadatas")
+                else []
+            ),
             "ids": [results["ids"][i] for i in filtered_indices] if results.get("ids") else [],
-            "distances": [results["distances"][i] for i in filtered_indices] if results.get("distances") else [],
+            "distances": (
+                [results["distances"][i] for i in filtered_indices]
+                if results.get("distances")
+                else []
+            ),
             "similarities": [results["similarities"][i] for i in filtered_indices],
-            "query": results.get("query", "")
+            "query": results.get("query", ""),
         }
 
         if len(filtered_results["documents"]) < 3 and results["documents"]:
-            logger.warning(f"Only {len(filtered_results['documents'])} docs above threshold {threshold}")
+            logger.warning(
+                f"Only {len(filtered_results['documents'])} docs above threshold {threshold}"
+            )
 
             valid_docs = [
-                (i, sim) for i, sim in enumerate(results["similarities"])
+                (i, sim)
+                for i, sim in enumerate(results["similarities"])
                 if sim >= ABSOLUTE_MIN_SIMILARITY
             ]
 
@@ -322,18 +333,30 @@ class RetrieverNode:
                 n_best = min(3, len(valid_docs))
                 best_indices = [i for i, sim in valid_docs[:n_best]]
 
-                logger.info(f"Using top {n_best} results (above absolute min {ABSOLUTE_MIN_SIMILARITY})")
+                logger.info(
+                    f"Using top {n_best} results (above absolute min {ABSOLUTE_MIN_SIMILARITY})"
+                )
 
                 filtered_results = {
                     "documents": [results["documents"][i] for i in best_indices],
-                    "metadatas": [results["metadatas"][i] for i in best_indices] if results.get("metadatas") else [],
+                    "metadatas": (
+                        [results["metadatas"][i] for i in best_indices]
+                        if results.get("metadatas")
+                        else []
+                    ),
                     "ids": [results["ids"][i] for i in best_indices] if results.get("ids") else [],
-                    "distances": [results["distances"][i] for i in best_indices] if results.get("distances") else [],
+                    "distances": (
+                        [results["distances"][i] for i in best_indices]
+                        if results.get("distances")
+                        else []
+                    ),
                     "similarities": [results["similarities"][i] for i in best_indices],
-                    "query": results.get("query", "")
+                    "query": results.get("query", ""),
                 }
             else:
-                logger.warning(f"No documents meet absolute minimum threshold {ABSOLUTE_MIN_SIMILARITY}")
+                logger.warning(
+                    f"No documents meet absolute minimum threshold {ABSOLUTE_MIN_SIMILARITY}"
+                )
                 filtered_results = self._empty_results(results.get("query", ""))
 
         if self.search_config.get("rerank") and len(filtered_results["documents"]) > 1:
@@ -368,11 +391,15 @@ class RetrieverNode:
 
             reranked_results = {
                 "documents": [results["documents"][i] for i in new_order],
-                "metadatas": [results["metadatas"][i] for i in new_order] if results.get("metadatas") else [],
+                "metadatas": (
+                    [results["metadatas"][i] for i in new_order] if results.get("metadatas") else []
+                ),
                 "ids": [results["ids"][i] for i in new_order] if results.get("ids") else [],
-                "distances": [results["distances"][i] for i in new_order] if results.get("distances") else [],
+                "distances": (
+                    [results["distances"][i] for i in new_order] if results.get("distances") else []
+                ),
                 "similarities": [results["similarities"][i] for i in new_order],
-                "query": results["query"]
+                "query": results["query"],
             }
 
             return reranked_results
@@ -418,11 +445,19 @@ class RetrieverNode:
 
         diversified_results = {
             "documents": [results["documents"][i] for i in selected_indices],
-            "metadatas": [results["metadatas"][i] for i in selected_indices] if results.get("metadatas") else [],
+            "metadatas": (
+                [results["metadatas"][i] for i in selected_indices]
+                if results.get("metadatas")
+                else []
+            ),
             "ids": [results["ids"][i] for i in selected_indices] if results.get("ids") else [],
-            "distances": [results["distances"][i] for i in selected_indices] if results.get("distances") else [],
+            "distances": (
+                [results["distances"][i] for i in selected_indices]
+                if results.get("distances")
+                else []
+            ),
             "similarities": [results["similarities"][i] for i in selected_indices],
-            "query": results["query"]
+            "query": results["query"],
         }
         return diversified_results
 
@@ -447,7 +482,7 @@ class RetrieverNode:
                 "query": original_query,
                 "summary": "No documents meeting the criteria.",
                 "confidence": float(0.0),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
         avg_similarity = np.mean(results["similarities"]) if results["similarities"] else 0.0
@@ -476,10 +511,14 @@ class RetrieverNode:
             "stats": {
                 "total_documents": len(results["documents"]),
                 "avg_similarity": float(avg_similarity),
-                "min_similarity": float(min(results["similarities"])) if results["similarities"] else 0.0,
-                "max_similarity": float(max(results["similarities"])) if results["similarities"] else 0.0,
-                "threshold_used": self.search_config["score_threshold"]
-            }
+                "min_similarity": (
+                    float(min(results["similarities"])) if results["similarities"] else 0.0
+                ),
+                "max_similarity": (
+                    float(max(results["similarities"])) if results["similarities"] else 0.0
+                ),
+                "threshold_used": self.search_config["score_threshold"],
+            },
         }
 
         return processed_results
@@ -497,7 +536,7 @@ class RetrieverNode:
             "confidence": float(0.0),
             "timestamp": datetime.now().isoformat(),
             "error": str(error),
-            "error_type": type(error).__name__
+            "error_type": type(error).__name__,
         }
 
     def as_runnable(self) -> Callable:
@@ -540,9 +579,9 @@ class RetrieverNode:
                         "stats": results.get("stats", {}),
                         "timestamp": results.get("timestamp"),
                         "query_used": results.get("query"),
-                        "metadatas": results.get("metadatas", [])
-                    }
-                }
+                        "metadatas": results.get("metadatas", []),
+                    },
+                },
             )
 
             history_entry = {
@@ -551,10 +590,10 @@ class RetrieverNode:
                 "content": f"Retrieved {len(results.get('documents', []))} documents.",
                 "confidence": float(results.get("confidence", 0.0)),
                 "details": {
-                    "query": state.get('search_query'),
+                    "query": state.get("search_query"),
                     "documents_found": len(results.get("documents", [])),
-                    "avg_similarity": results.get("stats", {}).get("avg_similarity", 0.0)
-                }
+                    "avg_similarity": results.get("stats", {}).get("avg_similarity", 0.0),
+                },
             }
 
             history = list(new_state.get("history", []))
@@ -578,9 +617,9 @@ class RetrieverFactory:
 
     @staticmethod
     def create_retriever(
-            collection_name: str = "documents",
-            persist_directory: str = "data/vector_store/chroma",
-            search_config: Optional[Dict[str, Any]] = None
+        collection_name: str = "documents",
+        persist_directory: str = "data/vector_store/chroma",
+        search_config: Optional[Dict[str, Any]] = None,
     ) -> RetrieverNode:
         """
         Create a RetrieverNode configured for ChromaDB.
@@ -602,7 +641,7 @@ class RetrieverFactory:
             vector_store = ChromaDBVectorStore(
                 collection_name=collection_name,
                 persist_directory=persist_directory,
-                reset_on_start=False
+                reset_on_start=False,
             )
 
             logger.info(f"Created ChromaDB retriever for: {collection_name}")

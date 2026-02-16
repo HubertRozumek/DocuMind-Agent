@@ -1,10 +1,11 @@
 import json
 import logging
-from typing import List, Dict, Any, Optional
+import re
 import time
 from abc import ABC, abstractmethod
+from typing import Any, List, Optional
+
 import requests
-import re
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ class BaseGraderModel(ABC):
         timeout: Request timeout in seconds
     """
 
-    def __init__(self, model_name: str, **kwargs):
+    def __init__(self, model_name: str, **kwargs) -> None:
         """
         Initialize base grader model.
 
@@ -51,7 +52,9 @@ class BaseGraderModel(ABC):
         pass
 
     @abstractmethod
-    def grade_batch(self, prompts: List[str], system_prompts: Optional[List[str]] = None) -> List[str]:
+    def grade_batch(
+        self, prompts: List[str], system_prompts: Optional[List[str]] = None
+    ) -> List[str]:
         """
         Perform batch grading for multiple documents.
 
@@ -64,7 +67,7 @@ class BaseGraderModel(ABC):
         """
         pass
 
-    def validate_response(self, response: str, expected_format: str) -> Dict[str, Any]:
+    def validate_response(self, response: str, expected_format: str) -> Any:
         """
         Validate and parse model response.
 
@@ -107,7 +110,9 @@ class BaseGraderModel(ABC):
         """
         logger.warning("Using fallback grading (primary model not available)")
 
-        question_keywords = self._extract_keywords(prompt.split("QUESTION:")[1].split("DOCUMENT:")[0])
+        question_keywords = self._extract_keywords(
+            prompt.split("QUESTION:")[1].split("DOCUMENT:")[0]
+        )
         document_text = prompt.split("DOCUMENT:")[1] if "DOCUMENT:" in prompt else ""
         document_keywords = self._extract_keywords(document_text)
 
@@ -129,17 +134,135 @@ class BaseGraderModel(ABC):
         Returns:
             List of keywords
         """
-        stop_words = ["i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you", "your", "yours", "yourself",
-                      "yourselves", "he", "him", "his", "himself", "she", "her", "hers", "herself", "it", "its",
-                      "itself", "they", "them", "their", "theirs", "themselves", "what", "which", "who", "whom", "this",
-                      "that", "these", "those", "am", "is", "are", "was", "were", "be", "been", "being", "have", "has",
-                      "had", "having", "do", "does", "did", "doing", "a", "an", "the", "and", "but", "if", "or",
-                      "because", "as", "until", "while", "of", "at", "by", "for", "with", "about", "against", "between",
-                      "into", "through", "during", "before", "after", "above", "below", "to", "from", "up", "down",
-                      "in", "out", "on", "off", "over", "under", "again", "further", "then", "once", "here", "there",
-                      "when", "where", "why", "how", "all", "any", "both", "each", "few", "more", "most", "other",
-                      "some", "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too", "very", "s", "t",
-                      "can", "will", "just", "don", "should", "now"]
+        stop_words = [
+            "i",
+            "me",
+            "my",
+            "myself",
+            "we",
+            "our",
+            "ours",
+            "ourselves",
+            "you",
+            "your",
+            "yours",
+            "yourself",
+            "yourselves",
+            "he",
+            "him",
+            "his",
+            "himself",
+            "she",
+            "her",
+            "hers",
+            "herself",
+            "it",
+            "its",
+            "itself",
+            "they",
+            "them",
+            "their",
+            "theirs",
+            "themselves",
+            "what",
+            "which",
+            "who",
+            "whom",
+            "this",
+            "that",
+            "these",
+            "those",
+            "am",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "being",
+            "have",
+            "has",
+            "had",
+            "having",
+            "do",
+            "does",
+            "did",
+            "doing",
+            "a",
+            "an",
+            "the",
+            "and",
+            "but",
+            "if",
+            "or",
+            "because",
+            "as",
+            "until",
+            "while",
+            "of",
+            "at",
+            "by",
+            "for",
+            "with",
+            "about",
+            "against",
+            "between",
+            "into",
+            "through",
+            "during",
+            "before",
+            "after",
+            "above",
+            "below",
+            "to",
+            "from",
+            "up",
+            "down",
+            "in",
+            "out",
+            "on",
+            "off",
+            "over",
+            "under",
+            "again",
+            "further",
+            "then",
+            "once",
+            "here",
+            "there",
+            "when",
+            "where",
+            "why",
+            "how",
+            "all",
+            "any",
+            "both",
+            "each",
+            "few",
+            "more",
+            "most",
+            "other",
+            "some",
+            "such",
+            "no",
+            "nor",
+            "not",
+            "only",
+            "own",
+            "same",
+            "so",
+            "than",
+            "too",
+            "very",
+            "s",
+            "t",
+            "can",
+            "will",
+            "just",
+            "don",
+            "should",
+            "now",
+        ]
 
         words = text.lower().split()
         keywords = [w for w in words if w not in stop_words and len(w) > 3]
@@ -157,16 +280,18 @@ class BaseGraderModel(ABC):
         """
         response_lower = response.strip().lower()
 
-        if any(pattern in response_lower for pattern in ['not relevant', 'false', 'no', 'irrelevant']):
+        if any(
+            pattern in response_lower for pattern in ["not relevant", "false", "no", "irrelevant"]
+        ):
             return False
 
-        if any(pattern in response_lower for pattern in ['yes', 'true', 'relevant']):
+        if any(pattern in response_lower for pattern in ["yes", "true", "relevant"]):
             return True
 
         logger.warning(f"Could not parse boolean response: {response}")
         return False
 
-    def _fix_json_response(self, response: str) -> Dict[str, Any]:
+    def _fix_json_response(self, response: str) -> Any:
         """
         Attempt to repair malformed JSON responses.
 
@@ -179,21 +304,21 @@ class BaseGraderModel(ABC):
         Returns:
             Parsed dictionary or heuristic result
         """
-        json_match = re.search(r'\{[^}]+\}', response)
+        json_match = re.search(r"\{[^}]+\}", response)
         if json_match:
             try:
                 return json.loads(json_match.group(0))
             except json.JSONDecodeError:
                 pass
 
-        lines = response.strip().split('\n')
+        lines = response.strip().split("\n")
         json_lines = []
 
         for line in lines:
-            if line.strip().startswith("{") or line.strip().endswith("}") or ':' in line:
+            if line.strip().startswith("{") or line.strip().endswith("}") or ":" in line:
                 json_lines.append(line)
 
-        cleaned = '\n'.join(json_lines)
+        cleaned = "\n".join(json_lines)
 
         if not cleaned.startswith("{"):
             cleaned = "{" + cleaned
@@ -206,8 +331,8 @@ class BaseGraderModel(ABC):
             logger.warning("Could not parse JSON, using heuristic fallback")
 
             lower_resp = response.lower()
-            relevant_keywords = ['create', 'use', 'example', 'numpy', 'array', 'function']
-            irrelevant_keywords = ['cannot', 'not found', 'no information', 'unclear']
+            relevant_keywords = ["create", "use", "example", "numpy", "array", "function"]
+            irrelevant_keywords = ["cannot", "not found", "no information", "unclear"]
 
             relevant_score = sum(1 for kw in relevant_keywords if kw in lower_resp)
             irrelevant_score = sum(1 for kw in irrelevant_keywords if kw in lower_resp)
@@ -220,7 +345,7 @@ class BaseGraderModel(ABC):
                 "confidence": confidence,
                 "reason": f"Heuristic: found {relevant_score} relevant keywords",
                 "error": "json_parse_failed",
-                "original_response": response[:100]
+                "original_response": response[:100],
             }
 
 
@@ -247,9 +372,9 @@ class OllamaGrader(BaseGraderModel):
             **kwargs: Configuration including base_url, temperature, max_tokens
         """
         super().__init__(model_name, **kwargs)
-        self.base_url = kwargs.get('base_url', 'http://localhost:11434')
-        self.temperature = kwargs.get('temperature', 0.0)
-        self.max_tokens = kwargs.get('max_tokens', 200)
+        self.base_url = kwargs.get("base_url", "http://localhost:11434")
+        self.temperature = kwargs.get("temperature", 0.0)
+        self.max_tokens = kwargs.get("max_tokens", 200)
 
         self._check_connection()
 
@@ -258,8 +383,8 @@ class OllamaGrader(BaseGraderModel):
         try:
             response = requests.get(f"{self.base_url}/api/tags", timeout=5)
             if response.status_code == 200:
-                models = response.json().get('models', [])
-                model_names = [m['name'] for m in models]
+                models = response.json().get("models", [])
+                model_names = [m["name"] for m in models]
 
                 if self.model_name in model_names:
                     logger.info(f"Successfully connected to {self.model_name}")
@@ -295,7 +420,7 @@ class OllamaGrader(BaseGraderModel):
         Returns:
             Model response or fallback result
         """
-        if not getattr(self, 'available', False):
+        if not getattr(self, "available", False):
             return self._fallback_grade(prompt)
 
         payload = {
@@ -304,10 +429,7 @@ class OllamaGrader(BaseGraderModel):
             "system": system_prompt,
             "stream": False,
             "format": "json",
-            "options": {
-                "temperature": self.temperature,
-                "num_predict": self.max_tokens
-            }
+            "options": {"temperature": self.temperature, "num_predict": self.max_tokens},
         }
 
         for attempt in range(self.retry_count):
@@ -320,7 +442,7 @@ class OllamaGrader(BaseGraderModel):
 
                 if response.status_code == 200:
                     result = response.json()
-                    return result.get('response', '').strip()
+                    return result.get("response", "").strip()
                 else:
                     logger.warning(f"Ollama API error: {response.status_code}")
 
@@ -329,12 +451,14 @@ class OllamaGrader(BaseGraderModel):
                 time.sleep(1)
 
             except Exception:
-                wait_time = (2 ** attempt)
+                wait_time = 2**attempt
                 time.sleep(wait_time)
 
         return self._fallback_grade(prompt)
 
-    def grade_batch(self, prompts: List[str], system_prompts: Optional[List[str]] = None) -> List[str]:
+    def grade_batch(
+        self, prompts: List[str], system_prompts: Optional[List[str]] = None
+    ) -> List[str]:
         """
         Grade multiple documents sequentially.
 
@@ -348,7 +472,9 @@ class OllamaGrader(BaseGraderModel):
         results = []
 
         for i, prompt in enumerate(prompts):
-            system_prompt = system_prompts[i] if system_prompts and i < len(system_prompts) else None
+            system_prompt = (
+                system_prompts[i] if system_prompts and i < len(system_prompts) else None
+            )
             result = self.grade(prompt, system_prompt=system_prompt)
             results.append(result)
 
@@ -378,7 +504,7 @@ class GraderFactory:
         Raises:
             ValueError: If grader_type is not supported
         """
-        if grader_type == 'ollama':
+        if grader_type == "ollama":
             return OllamaGrader(**kwargs)
         else:
             raise ValueError(f"Unknown grader type: {grader_type}")

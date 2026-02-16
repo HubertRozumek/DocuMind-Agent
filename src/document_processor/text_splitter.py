@@ -1,22 +1,25 @@
 import logging
-from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 try:
-    from langchain_text_splitters import RecursiveCharacterTextSplitter, TokenTextSplitter, CharacterTextSplitter
+    from langchain_text_splitters import (
+        CharacterTextSplitter,
+        RecursiveCharacterTextSplitter,
+        TokenTextSplitter,
+    )
+
     LANGCHAIN_AVAILABLE = True
 except ImportError:
     LANGCHAIN_AVAILABLE = False
-    logger.warning(
-        "LangChain not available. Install with: "
-        "pip install langchain tiktoken"
-    )
+    logger.warning("LangChain not available. Install with: " "pip install langchain tiktoken")
 
 try:
     from langchain_experimental.text_splitter import SemanticChunker
     from langchain_openai import OpenAIEmbeddings
+
     SEMANTIC_AVAILABLE = True
 except ImportError:
     SEMANTIC_AVAILABLE = False
@@ -27,6 +30,7 @@ class Chunk:
     """
     Chunk dataclass compatible with LangChain.
     """
+
     text: str
     metadata: Dict[str, Any]
     chunk_id: str
@@ -45,11 +49,7 @@ class Chunk:
         return len(self.text.split())
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            "text": self.text,
-            "metadata": self.metadata,
-            "chunk_id": self.chunk_id
-        }
+        return {"text": self.text, "metadata": self.metadata, "chunk_id": self.chunk_id}
 
 
 class TextSplitter:
@@ -67,10 +67,10 @@ class TextSplitter:
         self,
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
-        strategy: str = "recursive",
+        strategy: str = "token",
         length_function: str = "len",
         separators: Optional[List[str]] = None,
-        min_chunk_size: int = 50
+        min_chunk_size: int = 50,
     ):
         """
         Initialize text splitter.
@@ -84,9 +84,7 @@ class TextSplitter:
             min_chunk_size: Minimum chunk size to keep
         """
         if not LANGCHAIN_AVAILABLE:
-            raise ImportError(
-                "LangChain required. Install: pip install langchain tiktoken"
-            )
+            raise ImportError("LangChain required. Install: pip install langchain tiktoken")
 
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
@@ -108,7 +106,7 @@ class TextSplitter:
         chunk_size: int,
         chunk_overlap: int,
         length_function: str,
-        separators: Optional[List[str]]
+        separators: Optional[List[str]],
     ):
         """Create appropriate LangChain splitter."""
 
@@ -119,15 +117,15 @@ class TextSplitter:
                 # Default separators (optimized)
                 separators = [
                     "\n\n",  # Paragraphs
-                    "\n",    # Lines
-                    ". ",    # Sentences
+                    "\n",  # Lines
+                    ". ",  # Sentences
                     "? ",
                     "! ",
                     "; ",
                     ": ",
                     ", ",
-                    " ",     # Words
-                    ""       # Characters (fallback)
+                    " ",  # Words
+                    "",  # Characters (fallback)
                 ]
 
             return RecursiveCharacterTextSplitter(
@@ -135,17 +133,14 @@ class TextSplitter:
                 chunk_overlap=chunk_overlap,
                 length_function=len if length_function == "len" else self._token_length,
                 separators=separators,
-                keep_separator=True
+                keep_separator=True,
             )
 
         elif strategy == "token":
             # Token-aware splitting (best for embeddings)
             # Uses tiktoken to count tokens accurately
 
-            return TokenTextSplitter(
-                chunk_size=chunk_size,
-                chunk_overlap=chunk_overlap
-            )
+            return TokenTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
 
         elif strategy == "semantic":
             # AI-powered semantic splitting
@@ -162,18 +157,13 @@ class TextSplitter:
                 "Set OPENAI_API_KEY environment variable."
             )
 
-            return SemanticChunker(
-                OpenAIEmbeddings(),
-                breakpoint_threshold_type="percentile"
-            )
+            return SemanticChunker(OpenAIEmbeddings(), breakpoint_threshold_type="percentile")
 
         elif strategy == "character":
             # Simple character-based splitting
 
             return CharacterTextSplitter(
-                chunk_size=chunk_size,
-                chunk_overlap=chunk_overlap,
-                separator="\n\n"
+                chunk_size=chunk_size, chunk_overlap=chunk_overlap, separator="\n\n"
             )
 
         else:
@@ -183,17 +173,14 @@ class TextSplitter:
         """Count tokens using tiktoken."""
         try:
             import tiktoken
+
             encoding = tiktoken.get_encoding("cl100k_base")
             return len(encoding.encode(text))
         except Exception as e:
             logger.warning(f"Token counting failed: {e}, using len()")
             return len(text)
 
-    def split_text(
-        self,
-        text: str,
-        metadata: Optional[Dict] = None
-    ) -> List[Chunk]:
+    def split_text(self, text: str, metadata: Optional[Dict] = None) -> List[Chunk]:
         """
         Split text into chunks.
 
@@ -233,24 +220,18 @@ class TextSplitter:
                     "chunk_index": i,
                     "strategy": self.strategy,
                     "chunk_size_config": self.chunk_size,
-                    "overlap_config": self.chunk_overlap
+                    "overlap_config": self.chunk_overlap,
                 },
-                chunk_id=f"{metadata.get('doc_id', 'doc')}_{i}"
+                chunk_id=f"{metadata.get('doc_id', 'doc')}_{i}",
             )
 
             chunks.append(chunk)
 
-        logger.info(
-            f"Split into {len(chunks)} chunks "
-            f"(filtered from {len(langchain_docs)})"
-        )
+        logger.info(f"Split into {len(chunks)} chunks " f"(filtered from {len(langchain_docs)})")
 
         return chunks
 
-    def split_documents(
-        self,
-        documents: List[Dict[str, Any]]
-    ) -> List[Chunk]:
+    def split_documents(self, documents: List[Dict[str, Any]]) -> List[Chunk]:
         """
         Split multiple documents.
 
@@ -305,17 +286,17 @@ class ChunkAnalyzer:
                 "median": float(np.median(lengths)),
                 "std": float(np.std(lengths)),
                 "min": int(np.min(lengths)),
-                "max": int(np.max(lengths))
+                "max": int(np.max(lengths)),
             },
             "word_stats": {
                 "mean": float(np.mean(word_counts)),
                 "median": float(np.median(word_counts)),
                 "std": float(np.std(word_counts)),
                 "min": int(np.min(word_counts)),
-                "max": int(np.max(word_counts))
+                "max": int(np.max(word_counts)),
             },
             "total_chars": int(sum(lengths)),
-            "total_words": int(sum(word_counts))
+            "total_words": int(sum(word_counts)),
         }
 
         return stats

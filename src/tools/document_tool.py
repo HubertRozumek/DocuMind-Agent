@@ -1,6 +1,7 @@
 import logging
-from typing import Dict, Any, List, Optional
-from langchain_core.tools import Tool, StructuredTool
+from typing import Any, Dict, List, Optional
+
+from langchain_core.tools import StructuredTool, Tool
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -11,6 +12,7 @@ class TicketCheckInput(BaseModel):
     """
     Input schema for ticket checking tool
     """
+
     ticket_id: str = Field(description="Ticket ID to check (e.g., TICKET-001)")
 
 
@@ -18,6 +20,7 @@ class UserTicketsInput(BaseModel):
     """
     Input schema for user tickets search
     """
+
     user: str = Field(description="Username to search tickets for")
 
 
@@ -25,6 +28,7 @@ class DocumentSearchInput(BaseModel):
     """
     Input schema for document search
     """
+
     query: str = Field(description="Search query for documents")
     top_k: int = Field(default=5, description="Number of results to return")
 
@@ -33,6 +37,7 @@ class TicketCreationInput(BaseModel):
     """
     Input schema for creating tickets
     """
+
     title: str = Field(description="Ticket title")
     description: str = Field(description="Detailed description of the issue")
     priority: str = Field(default="medium", description="Priority: low, medium, high, critical")
@@ -48,9 +53,9 @@ def create_ticket_tools() -> List[Tool]:
     """
     from src.tools.ticket_checker import (
         check_ticket_status,
-        search_my_tickets,
         get_open_tickets_summary,
         get_ticket_api,
+        search_my_tickets,
     )
 
     tools = [
@@ -188,7 +193,7 @@ class ToolRouter:
         """
         self.tools = {tool.name: tool for tool in tools}
         self.vector_store = vector_store
-        self.tool_usage_stats = {}
+        self.tool_usage_stats: Dict = {}
 
         # Keywords that suggest tool usage
         self.ticket_keywords = [
@@ -216,7 +221,8 @@ class ToolRouter:
         if any(keyword in query_lower for keyword in self.ticket_keywords):
             # Extract ticket ID if present
             import re
-            ticket_match = re.search(r'ticket[- ]?(\d+)', query_lower)
+
+            ticket_match = re.search(r"ticket[- ]?(\d+)", query_lower)
 
             # "My tickets" query
             if "my tickets" in query_lower or "my ticket" in query_lower:
@@ -237,8 +243,10 @@ class ToolRouter:
                 return ("get_ticket_statistics", {})
 
         # Document count query
-        if any(phrase in query_lower for phrase in
-               ["how many documents", "number of documents", "document count"]):
+        if any(
+            phrase in query_lower
+            for phrase in ["how many documents", "number of documents", "document count"]
+        ):
             return ("get_document_count", {})
 
         # Default to document search
@@ -266,9 +274,7 @@ class ToolRouter:
                     tool = self.tools[tool_name]
 
                     # Track usage
-                    self.tool_usage_stats[tool_name] = (
-                            self.tool_usage_stats.get(tool_name, 0) + 1
-                    )
+                    self.tool_usage_stats[tool_name] = self.tool_usage_stats.get(tool_name, 0) + 1
 
                     # Execute tool
                     try:
@@ -305,9 +311,7 @@ class ToolRouter:
             logger.info("Routing to document search")
 
             if self.vector_store:
-                results = self.vector_store.search(
-                    query=query, n_results=kwargs.get("top_k", 5)
-                )
+                results = self.vector_store.search(query=query, n_results=kwargs.get("top_k", 5))
 
                 return {
                     "type": "document_search",
@@ -378,18 +382,17 @@ class ToolErrorHandler:
             "error_type": type(error).__name__,
             "error_message": str(error),
             "query": query,
-            "timestamp": logging.Formatter().formatTime(logging.LogRecord(
-                name="", level=0, pathname="", lineno=0,
-                msg="", args=(), exc_info=None
-            )),
+            "timestamp": logging.Formatter().formatTime(
+                logging.LogRecord(
+                    name="", level=0, pathname="", lineno=0, msg="", args=(), exc_info=None
+                )
+            ),
         }
 
         self.error_log.append(error_entry)
         self.error_counts[tool_name] = self.error_counts.get(tool_name, 0) + 1
 
-        logger.error(
-            f"Tool '{tool_name}' failed with {type(error).__name__}: {str(error)}"
-        )
+        logger.error(f"Tool '{tool_name}' failed with {type(error).__name__}: {str(error)}")
 
         response = {
             "success": False,
@@ -401,8 +404,7 @@ class ToolErrorHandler:
         if fallback_to_search:
             logger.info("Falling back to document search")
             response["fallback_message"] = (
-                f"The {tool_name} tool encountered an error. "
-                "Searching documents instead..."
+                f"The {tool_name} tool encountered an error. " "Searching documents instead..."
             )
 
         return response

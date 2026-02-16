@@ -5,25 +5,23 @@ Tests agent initialization, graph building, invocation,
 and end-to-end RAG pipeline execution.
 """
 
-import pytest
-from pathlib import Path
 import sys
-from unittest.mock import Mock, patch, MagicMock
+from pathlib import Path
+from unittest.mock import Mock, patch
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 # ==================== AGENT INITIALIZATION TESTS ====================
 
+
 def test_agent_initialization():
     """Test DocuMindAgent initialization."""
     from src.agent.agent_builder import DocuMindAgent
 
-    agent = DocuMindAgent(
-        max_iterations=2,
-        search_threshold=0.7,
-        use_tools=False
-    )
+    agent = DocuMindAgent(max_iterations=2, search_threshold=0.7, use_tools=False)
 
     assert agent.max_iterations == 2
     assert agent.search_threshold == 0.7
@@ -39,7 +37,7 @@ def test_agent_initialization_with_configs(agent_config):
         grader_config=agent_config["grader_config"],
         generator_config=agent_config["generator_config"],
         max_iterations=agent_config["max_iterations"],
-        use_tools=agent_config["use_tools"]
+        use_tools=agent_config["use_tools"],
     )
 
     assert agent.vector_store_config == agent_config["vector_store_config"]
@@ -60,8 +58,9 @@ def test_agent_default_configs():
 
 # ==================== COMPONENT BUILDING TESTS ====================
 
-@patch('src.agent.agent_builder.ChromaDBVectorStore')
-@patch('src.agent.agent_builder.EmbeddingManager')
+
+@patch("src.agent.agent_builder.ChromaDBVectorStore")
+@patch("src.agent.agent_builder.EmbeddingManager")
 def test_build_components(mock_embedding, mock_vector_store, agent_config):
     """Test building agent components."""
     from src.agent.agent_builder import DocuMindAgent
@@ -73,16 +72,18 @@ def test_build_components(mock_embedding, mock_vector_store, agent_config):
     agent = DocuMindAgent(**agent_config)
 
     # Mock the internal components that require LLM
-    with patch.object(agent, 'retriever'), \
-            patch.object(agent, 'grader'), \
-            patch.object(agent, 'rewriter'), \
-            patch.object(agent, 'generator'):
+    with (
+        patch.object(agent, "retriever"),
+        patch.object(agent, "grader"),
+        patch.object(agent, "rewriter"),
+        patch.object(agent, "generator"),
+    ):
         result = agent.build_components()
 
         assert result is True
 
 
-@patch('src.agent.agent_builder.EmbeddingManager')
+@patch("src.agent.agent_builder.EmbeddingManager")
 def test_build_components_creates_retriever(mock_embedding, agent_config):
     """Test that build_components creates retriever."""
     from src.agent.agent_builder import DocuMindAgent
@@ -91,11 +92,13 @@ def test_build_components_creates_retriever(mock_embedding, agent_config):
 
     agent = DocuMindAgent(**agent_config)
 
-    with patch('src.agent.agent_builder.ChromaDBVectorStore'), \
-            patch('src.agent.agent_builder.RetrieverNode'), \
-            patch('src.agent.agent_builder.GraderNode'), \
-            patch('src.agent.agent_builder.QueryRewriter'), \
-            patch('src.agent.agent_builder.GeneratorNode'):
+    with (
+        patch("src.agent.agent_builder.ChromaDBVectorStore"),
+        patch("src.agent.agent_builder.RetrieverNode"),
+        patch("src.agent.agent_builder.GraderNode"),
+        patch("src.agent.agent_builder.QueryRewriter"),
+        patch("src.agent.agent_builder.GeneratorNode"),
+    ):
         agent.build_components()
 
         assert agent.retriever is not None
@@ -108,14 +111,15 @@ def test_build_components_failure_handling(agent_config):
     agent = DocuMindAgent(**agent_config)
 
     # Force an error
-    with patch('src.agent.agent_builder.EmbeddingManager', side_effect=Exception("Test error")):
+    with patch("src.agent.agent_builder.EmbeddingManager", side_effect=Exception("Test error")):
         with pytest.raises(Exception):
             agent.build_components()
 
 
 # ==================== GRAPH BUILDING TESTS ====================
 
-@patch('src.agent.agent_builder.DocuMindAgent.build_components')
+
+@patch("src.agent.agent_builder.DocuMindAgent.build_components")
 def test_build_graph(mock_build_components, agent_config):
     """Test graph building."""
     from src.agent.agent_builder import DocuMindAgent
@@ -130,13 +134,14 @@ def test_build_graph(mock_build_components, agent_config):
     agent.rewriter = Mock()
     agent.generator = Mock()
 
-    with patch('src.agent.agent_builder.StateGraph'):
+    with patch("src.agent.agent_builder.StateGraph"):
         agent.build_graph()
 
         assert agent.graph is not None
 
 
 # ==================== INVOCATION TESTS ====================
+
 
 def test_agent_invoke_basic():
     """Test basic agent invocation."""
@@ -152,7 +157,7 @@ def test_agent_invoke_basic():
         "confidence": 0.8,
         "iterations": 1,
         "relevant_docs": ["doc1"],
-        "metadata": {}
+        "metadata": {},
     }
 
     agent.compiled_graph = mock_graph
@@ -176,7 +181,7 @@ def test_agent_invoke_with_no_answer():
         "answer": "",  # Empty answer
         "confidence": 0.0,
         "iterations": 1,
-        "metadata": {}
+        "metadata": {},
     }
 
     agent.compiled_graph = mock_graph
@@ -218,7 +223,7 @@ def test_agent_invoke_returns_metadata():
         "confidence": 0.9,
         "iterations": 2,
         "relevant_docs": ["doc1", "doc2"],
-        "metadata": {"grading_result": {"relevant_count": 2}}
+        "metadata": {"grading_result": {"relevant_count": 2}},
     }
 
     agent.compiled_graph = mock_graph
@@ -236,6 +241,7 @@ def test_agent_invoke_returns_metadata():
 
 # ==================== TOOL ROUTING TESTS ====================
 
+
 def test_agent_with_tools_disabled():
     """Test agent behavior with tools disabled."""
     from src.agent.agent_builder import DocuMindAgent
@@ -246,7 +252,7 @@ def test_agent_with_tools_disabled():
     assert len(agent.tools) == 0
 
 
-@patch('src.agent.agent_builder.create_all_tools')
+@patch("src.agent.agent_builder.create_all_tools")
 def test_agent_with_tools_enabled(mock_tools, agent_config):
     """Test agent with tools enabled."""
     from src.agent.agent_builder import DocuMindAgent
@@ -271,7 +277,7 @@ def test_tool_routing_node():
         "success": True,
         "type": "tool",
         "tool_name": "test_tool",
-        "result": "Tool result"
+        "result": "Tool result",
     }
 
     state = GraphState(
@@ -283,7 +289,7 @@ def test_tool_routing_node():
         needs_rewrite=False,
         confidence=0.0,
         history=[],
-        metadata={}
+        metadata={},
     )
 
     result_state = agent._tool_routing_node(state)
@@ -293,15 +299,12 @@ def test_tool_routing_node():
 
 # ==================== STATISTICS TESTS ====================
 
+
 def test_get_agent_info():
     """Test getting agent information."""
     from src.agent.agent_builder import DocuMindAgent
 
-    agent = DocuMindAgent(
-        max_iterations=3,
-        search_threshold=0.7,
-        use_tools=True
-    )
+    agent = DocuMindAgent(max_iterations=3, search_threshold=0.7, use_tools=True)
 
     info = agent.get_agent_info()
 
@@ -328,8 +331,9 @@ def test_reset_statistics():
 
 # ==================== FACTORY FUNCTION TESTS ====================
 
-@patch('src.agent.agent_builder.DocuMindAgent.build_graph')
-@patch('src.agent.agent_builder.DocuMindAgent.build_components')
+
+@patch("src.agent.agent_builder.DocuMindAgent.build_graph")
+@patch("src.agent.agent_builder.DocuMindAgent.build_components")
 def test_create_agent_factory(mock_build_components, mock_build_graph, agent_config):
     """Test create_agent factory function."""
     from src.agent.agent_builder import create_agent
@@ -344,8 +348,9 @@ def test_create_agent_factory(mock_build_components, mock_build_graph, agent_con
 
 # ==================== INTEGRATION TESTS ====================
 
-@patch('src.agent.agent_builder.ChromaDBVectorStore')
-@patch('src.agent.agent_builder.EmbeddingManager')
+
+@patch("src.agent.agent_builder.ChromaDBVectorStore")
+@patch("src.agent.agent_builder.EmbeddingManager")
 def test_agent_end_to_end_mock(mock_embedding, mock_vector_store, agent_config):
     """Test end-to-end agent execution with mocks."""
     from src.agent.agent_builder import DocuMindAgent
@@ -362,22 +367,19 @@ def test_agent_end_to_end_mock(mock_embedding, mock_vector_store, agent_config):
 
     # Mock all components
     agent.retriever = Mock()
-    agent.retriever.retrieve = Mock(return_value={
-        "documents": ["Python is a language"],
-        "metadata": {}
-    })
+    agent.retriever.retrieve = Mock(
+        return_value={"documents": ["Python is a language"], "metadata": {}}
+    )
 
     agent.grader = Mock()
-    agent.grader.grade = Mock(return_value={
-        "relevant_docs": ["Python is a language"],
-        "confidence": 0.8
-    })
+    agent.grader.grade = Mock(
+        return_value={"relevant_docs": ["Python is a language"], "confidence": 0.8}
+    )
 
     agent.generator = Mock()
-    agent.generator.generate = Mock(return_value={
-        "answer": "Python is a programming language",
-        "confidence": 0.9
-    })
+    agent.generator.generate = Mock(
+        return_value={"answer": "Python is a programming language", "confidence": 0.9}
+    )
 
     # Mock graph
     mock_graph = Mock()
@@ -387,7 +389,7 @@ def test_agent_end_to_end_mock(mock_embedding, mock_vector_store, agent_config):
         "confidence": 0.9,
         "iterations": 1,
         "relevant_docs": ["Python is a language"],
-        "metadata": {}
+        "metadata": {},
     }
 
     agent.compiled_graph = mock_graph
@@ -417,7 +419,7 @@ def test_agent_handles_empty_documents():
         "iterations": 1,
         "documents": [],
         "relevant_docs": [],
-        "metadata": {}
+        "metadata": {},
     }
 
     agent.compiled_graph = mock_graph
@@ -442,7 +444,7 @@ def test_agent_iteration_limiting():
         "answer": "Answer",
         "confidence": 0.7,
         "iterations": 2,
-        "metadata": {}
+        "metadata": {},
     }
 
     agent.compiled_graph = mock_graph
@@ -456,6 +458,7 @@ def test_agent_iteration_limiting():
 
 
 # ==================== PERFORMANCE TESTS ====================
+
 
 def test_agent_invocation_performance(performance_timer):
     """Test agent invocation performance."""
@@ -471,7 +474,7 @@ def test_agent_invocation_performance(performance_timer):
         "confidence": 0.8,
         "iterations": 1,
         "relevant_docs": ["doc"],
-        "metadata": {}
+        "metadata": {},
     }
 
     agent.compiled_graph = mock_graph
@@ -483,6 +486,7 @@ def test_agent_invocation_performance(performance_timer):
 
     # Mocked should be fast
     assert timer.elapsed < 1.0
+    assert result is not None
 
 
 if __name__ == "__main__":

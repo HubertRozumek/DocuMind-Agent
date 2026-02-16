@@ -5,14 +5,16 @@ Tests embedding generation, retriever functionality,
 and document retrieval with scoring.
 """
 
-import pytest
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 # ==================== EMBEDDINGS MANAGER TESTS ====================
+
 
 def test_embedding_manager_initialization():
     """Test EmbeddingManager initialization."""
@@ -65,21 +67,21 @@ def test_embedding_function_batch():
 
 # ==================== RETRIEVER NODE TESTS ====================
 
+
 def test_retriever_node_initialization(vector_store_config, mock_embedding_function):
     """Test RetrieverNode initialization."""
-    from src.vector_store.chroma_db import ChromaDBVectorStore
     from src.agent.nodes.retriever_node import RetrieverNode
+    from src.vector_store.chroma_db import ChromaDBVectorStore
 
     vector_store = ChromaDBVectorStore(
         collection_name=vector_store_config["collection_name"],
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
-        reset_on_start=True
+        reset_on_start=True,
     )
 
     retriever = RetrieverNode(
-        vector_store=vector_store,
-        search_config={"k": 3, "score_threshold": 0.5}
+        vector_store=vector_store, search_config={"k": 3, "score_threshold": 0.5}
     )
 
     assert retriever.vector_store is not None
@@ -88,9 +90,9 @@ def test_retriever_node_initialization(vector_store_config, mock_embedding_funct
 
 def test_retriever_retrieve_documents(vector_store_config, mock_embedding_function):
     """Test document retrieval."""
-    from src.vector_store.chroma_db import ChromaDBVectorStore
-    from src.agent.nodes.retriever_node import RetrieverNode
     from src.agent.graph_state import GraphState
+    from src.agent.nodes.retriever_node import RetrieverNode
+    from src.vector_store.chroma_db import ChromaDBVectorStore
 
     # Setup vector store with documents
     vector_store = ChromaDBVectorStore(
@@ -98,27 +100,18 @@ def test_retriever_retrieve_documents(vector_store_config, mock_embedding_functi
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
         reset_on_start=True,
-        client=None
+        client=None,
     )
     texts = [
         "Python is a programming language",
         "Machine learning is fascinating",
-        "The weather is nice"
+        "The weather is nice",
     ]
-    docs_to_add = [
-        {
-            "id": i,
-            "text": t,
-            "metadata": {}
-        } for i,t in enumerate(texts)]
+    docs_to_add = [{"id": i, "text": t, "metadata": {}} for i, t in enumerate(texts)]
     # Add some data
     vector_store.add_documents(docs_to_add)
 
-
-    retriever = RetrieverNode(
-        vector_store=vector_store,
-        search_config={"k": 2}
-    )
+    retriever = RetrieverNode(vector_store=vector_store, search_config={"k": 2})
 
     # Create state
     state = GraphState(
@@ -130,11 +123,11 @@ def test_retriever_retrieve_documents(vector_store_config, mock_embedding_functi
         needs_rewrite=False,
         confidence=0.0,
         history=[],
-        metadata={}
+        metadata={},
     )
 
     # Retrieve
-    result_state = retriever.retrieve("",state)
+    result_state = retriever.retrieve("", state)
 
     assert "documents" in result_state
     assert len(result_state["documents"]) <= 2
@@ -142,16 +135,16 @@ def test_retriever_retrieve_documents(vector_store_config, mock_embedding_functi
 
 def test_retriever_empty_collection(vector_store_config, mock_embedding_function):
     """Test retrieval from empty collection."""
-    from src.vector_store.chroma_db import ChromaDBVectorStore
-    from src.agent.nodes.retriever_node import RetrieverNode
     from src.agent.graph_state import GraphState
+    from src.agent.nodes.retriever_node import RetrieverNode
+    from src.vector_store.chroma_db import ChromaDBVectorStore
 
     vector_store = ChromaDBVectorStore(
         collection_name=vector_store_config["collection_name"],
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
         reset_on_start=True,
-        client=None
+        client=None,
     )
 
     retriever = RetrieverNode(vector_store=vector_store)
@@ -165,41 +158,35 @@ def test_retriever_empty_collection(vector_store_config, mock_embedding_function
         needs_rewrite=False,
         confidence=0.0,
         history=[],
-        metadata={}
+        metadata={},
     )
 
-    result_state = retriever.retrieve("",state=state)
+    result_state = retriever.retrieve("", state=state)
 
     assert result_state["documents"] == []
 
 
 def test_retriever_with_score_threshold(vector_store_config, mock_embedding_function):
     """Test retrieval with score threshold."""
-    from src.vector_store.chroma_db import ChromaDBVectorStore
-    from src.agent.nodes.retriever_node import RetrieverNode
     from src.agent.graph_state import GraphState
+    from src.agent.nodes.retriever_node import RetrieverNode
+    from src.vector_store.chroma_db import ChromaDBVectorStore
 
     vector_store = ChromaDBVectorStore(
         collection_name=vector_store_config["collection_name"],
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
         reset_on_start=True,
-        client=None
+        client=None,
     )
 
-    texts=["Relevant doc", "Another doc"]
-    docs_to_add = [
-        {
-            "id": i,
-            "text": t,
-            "metadata": {}
-        } for i, t in enumerate(texts)]
+    texts = ["Relevant doc", "Another doc"]
+    docs_to_add = [{"id": i, "text": t, "metadata": {}} for i, t in enumerate(texts)]
     # Add some data
     vector_store.add_documents(docs_to_add)
 
     retriever = RetrieverNode(
-        vector_store=vector_store,
-        search_config={"k": 5, "score_threshold": 0.8}
+        vector_store=vector_store, search_config={"k": 5, "score_threshold": 0.8}
     )
 
     state = GraphState(
@@ -211,10 +198,10 @@ def test_retriever_with_score_threshold(vector_store_config, mock_embedding_func
         needs_rewrite=False,
         confidence=0.0,
         history=[],
-        metadata={}
+        metadata={},
     )
 
-    result_state = retriever.retrieve("",state)
+    result_state = retriever.retrieve("", state)
 
     # Results depend on mock embeddings, just verify it runs
     assert "documents" in result_state
@@ -222,25 +209,20 @@ def test_retriever_with_score_threshold(vector_store_config, mock_embedding_func
 
 def test_retriever_updates_state_metadata(vector_store_config, mock_embedding_function):
     """Test that retriever updates state metadata."""
-    from src.vector_store.chroma_db import ChromaDBVectorStore
-    from src.agent.nodes.retriever_node import RetrieverNode
     from src.agent.graph_state import GraphState
+    from src.agent.nodes.retriever_node import RetrieverNode
+    from src.vector_store.chroma_db import ChromaDBVectorStore
 
     vector_store = ChromaDBVectorStore(
         collection_name=vector_store_config["collection_name"],
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
         reset_on_start=True,
-        client=None
+        client=None,
     )
 
-    texts=["Test document"]
-    docs_to_add = [
-        {
-            "id": i,
-            "text": t,
-            "metadata": {}
-        } for i, t in enumerate(texts)]
+    texts = ["Test document"]
+    docs_to_add = [{"id": i, "text": t, "metadata": {}} for i, t in enumerate(texts)]
     # Add some data
     vector_store.add_documents(docs_to_add)
 
@@ -255,10 +237,10 @@ def test_retriever_updates_state_metadata(vector_store_config, mock_embedding_fu
         needs_rewrite=False,
         confidence=0.0,
         history=[],
-        metadata={}
+        metadata={},
     )
 
-    result_state = retriever.retrieve("",state)
+    result_state = retriever.retrieve("", state)
 
     # Should have updated metadata
     assert "search_history" in result_state or "metadatas" in result_state
@@ -266,32 +248,24 @@ def test_retriever_updates_state_metadata(vector_store_config, mock_embedding_fu
 
 def test_retriever_performance(vector_store_config, mock_embedding_function, performance_timer):
     """Test retriever performance."""
-    from src.vector_store.chroma_db import ChromaDBVectorStore
-    from src.agent.nodes.retriever_node import RetrieverNode
     from src.agent.graph_state import GraphState
+    from src.agent.nodes.retriever_node import RetrieverNode
+    from src.vector_store.chroma_db import ChromaDBVectorStore
 
     vector_store = ChromaDBVectorStore(
         collection_name=vector_store_config["collection_name"],
         persist_directory=vector_store_config["persist_directory"],
         embedding_function=mock_embedding_function,
         reset_on_start=True,
-        client=None
+        client=None,
     )
 
     # Add many documents
     texts = [f"Document {i}" for i in range(200)]
-    docs_to_add = [
-        {
-            "id": i,
-            "text": t,
-            "metadata": {}
-        } for i, t in enumerate(texts)]
+    docs_to_add = [{"id": i, "text": t, "metadata": {}} for i, t in enumerate(texts)]
     # Add some data
     vector_store.add_documents(docs_to_add)
-    retriever = RetrieverNode(
-        vector_store=vector_store,
-        search_config={"k": 5}
-    )
+    retriever = RetrieverNode(vector_store=vector_store, search_config={"k": 5})
 
     state = GraphState(
         question="Test",
@@ -302,12 +276,13 @@ def test_retriever_performance(vector_store_config, mock_embedding_function, per
         needs_rewrite=False,
         confidence=0.0,
         history=[],
-        metadata={}
+        metadata={},
     )
 
     with performance_timer() as timer:
-        result_state = retriever.retrieve("",state)
+        result_state = retriever.retrieve("", state)
 
+    assert result_state is not None
     # Should be fast
     assert timer.elapsed < 2.0
 

@@ -1,10 +1,10 @@
-import logging
-from typing import Dict, Any, Optional, List
-from datetime import datetime, timedelta
-import random
-from enum import Enum
-import threading
 import html
+import logging
+import random
+import threading
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +13,7 @@ class TicketStatus(Enum):
     """
     Possible ticket statuses
     """
+
     OPEN = "open"
     IN_PROGRESS = "in_progress"
     PENDING = "pending"
@@ -24,6 +25,7 @@ class TicketPriority(Enum):
     """
     Ticket priority levels
     """
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -36,7 +38,7 @@ class MockTicketAPI:
     Simulates database with pre-populated tickets.
     """
 
-    def __init__(self, seed: int):
+    def __init__(self, seed: int = 42):
         """
         Initialize mock API with sample data.
 
@@ -128,7 +130,7 @@ class MockTicketAPI:
 
         return tickets
 
-    def get_ticket(self, ticket_id: str) -> Optional[Dict[str, Any]]:
+    def get_ticket(self, ticket_id: str) -> Optional[dict[str, dict[str, Any]]]:
         """
         Retrieve ticket by ID.
 
@@ -176,11 +178,11 @@ class MockTicketAPI:
         }
 
     def search_tickets(
-            self,
-            status: Optional[str] = None,
-            priority: Optional[str] = None,
-            assigned_to: Optional[str] = None,
-            category: Optional[str] = None,
+        self,
+        status: Optional[str] = None,
+        priority: Optional[str] = None,
+        assigned_to: Optional[str] = None,
+        category: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Search tickets by criteria.
@@ -240,9 +242,9 @@ class MockTicketAPI:
             Statistics dictionary
         """
         total = len(self.tickets_db)
-        by_status = {}
-        by_priority = {}
-        by_category = {}
+        by_status: Dict = {}
+        by_priority: Dict = {}
+        by_category: Dict = {}
 
         for ticket in self.tickets_db.values():
             # Count by status
@@ -266,11 +268,11 @@ class MockTicketAPI:
         }
 
     def create_ticket(
-            self,
-            title: str,
-            description: str,
-            priority: str = "medium",
-            category: str = "General",
+        self,
+        title: str,
+        description: str,
+        priority: str = "medium",
+        category: str = "General",
     ) -> Dict[str, Any]:
         """
         Create a new ticket (simulated).
@@ -324,6 +326,7 @@ class MockTicketAPI:
 # Global instance for easy access
 _global_api = None
 _api_lock = threading.Lock()
+
 
 def get_ticket_api() -> MockTicketAPI:
     """

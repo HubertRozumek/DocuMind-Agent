@@ -5,25 +5,23 @@ Tests document relevance grading, scoring mechanisms,
 and grading strategies.
 """
 
-import pytest
-from pathlib import Path
 import sys
-from unittest.mock import Mock, patch, MagicMock
+from pathlib import Path
+from unittest.mock import Mock, patch
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 # ==================== GRADER NODE TESTS ====================
 
+
 def test_grader_node_initialization():
     """Test GraderNode initialization."""
     from src.agent.nodes.grader_node import GraderNode
 
-    grader = GraderNode(
-        grader_type="robust",
-        confidence_threshold=0.7,
-        model_name="phi3:mini"
-    )
+    grader = GraderNode(grader_type="robust", confidence_threshold=0.7, model_name="phi3:mini")
 
     assert grader.confidence_threshold == 0.7
     assert grader.model_name == "phi3:mini"
@@ -52,13 +50,12 @@ def test_grade_single_document():
         score=RelevanceScore.RELEVANT,
         confidence=0.85,
         reason="Document discusses Python",
-        method="llm"
+        method="llm",
     )
 
-    with patch.object(grader.grader, 'grade', return_value=mock_result):
+    with patch.object(grader.grader, "grade", return_value=mock_result):
         result = grader.grade_document(
-            question="What is Python?",
-            document="Python is a programming language"
+            question="What is Python?", document="Python is a programming language"
         )
 
     assert isinstance(result, dict)
@@ -77,21 +74,18 @@ def test_grade_multiple_documents():
     documents = [
         "Python is a programming language",
         "The weather is sunny today",
-        "Python is used for machine learning"
+        "Python is used for machine learning",
     ]
 
     # Mock grade_batch to return mixed results
     mock_results = [
         GradingResult(RelevanceScore.RELEVANT, 0.9, "Relevant", "llm"),
         GradingResult(RelevanceScore.NOT_RELEVANT, 0.2, "Not relevant", "llm"),
-        GradingResult(RelevanceScore.RELEVANT, 0.8, "Relevant", "llm")
+        GradingResult(RelevanceScore.RELEVANT, 0.8, "Relevant", "llm"),
     ]
 
-    with patch.object(grader.grader, 'grade_batch', return_value=mock_results):
-        result = grader.grade_documents(
-            question="What is Python?",
-            documents=documents
-        )
+    with patch.object(grader.grader, "grade_batch", return_value=mock_results):
+        result = grader.grade_documents(question="What is Python?", documents=documents)
 
     assert "relevant_documents" in result
     assert "relevant_count" in result
@@ -107,11 +101,8 @@ def test_grade_documents_empty_list():
 
     grader = GraderNode()
 
-    with patch.object(grader.grader, 'grade_batch', return_value=[]):
-        result = grader.grade_documents(
-            question="Test question",
-            documents=[]
-        )
+    with patch.object(grader.grader, "grade_batch", return_value=[]):
+        result = grader.grade_documents(question="Test question", documents=[])
 
     assert result["relevant_count"] == 0
     assert result["total_count"] == 0
@@ -130,18 +121,15 @@ def test_grader_confidence_threshold_filtering():
     mock_results = [
         GradingResult(RelevanceScore.RELEVANT, 0.9, "High conf", "llm"),
         GradingResult(RelevanceScore.RELEVANT, 0.5, "Low conf", "llm"),
-        GradingResult(RelevanceScore.RELEVANT, 0.8, "High conf", "llm")
+        GradingResult(RelevanceScore.RELEVANT, 0.8, "High conf", "llm"),
     ]
 
     # is_relevant checks against threshold
     for i, result in enumerate(mock_results):
         result.is_relevant = lambda thresh=0.7, conf=result.confidence: conf >= thresh
 
-    with patch.object(grader.grader, 'grade_batch', return_value=mock_results):
-        result = grader.grade_documents(
-            question="Test",
-            documents=documents
-        )
+    with patch.object(grader.grader, "grade_batch", return_value=mock_results):
+        result = grader.grade_documents(question="Test", documents=documents)
 
     # Should filter based on threshold
     assert "relevant_documents" in result
@@ -149,8 +137,8 @@ def test_grader_confidence_threshold_filtering():
 
 def test_grader_runnable_with_state():
     """Test grader runnable with GraphState."""
-    from src.agent.nodes.grader_node import GraderNode
     from src.agent.graph_state import GraphState
+    from src.agent.nodes.grader_node import GraderNode
     from src.agent.nodes.robust_grader import GradingResult, RelevanceScore
 
     grader = GraderNode(confidence_threshold=0.6)
@@ -158,26 +146,23 @@ def test_grader_runnable_with_state():
     state = GraphState(
         question="What is Python?",
         search_query="Python",
-        documents=[
-            "Python is a programming language",
-            "Weather is sunny"
-        ],
+        documents=["Python is a programming language", "Weather is sunny"],
         relevant_docs=[],
         iterations=0,
         max_iterations=3,
         needs_rewrite=False,
         confidence=0.0,
         history=[],
-        metadata={}
+        metadata={},
     )
 
     # Mock the grading
     mock_results = [
         GradingResult(RelevanceScore.RELEVANT, 0.9, "Relevant", "llm"),
-        GradingResult(RelevanceScore.NOT_RELEVANT, 0.2, "Not relevant", "llm")
+        GradingResult(RelevanceScore.NOT_RELEVANT, 0.2, "Not relevant", "llm"),
     ]
 
-    with patch.object(grader.grader, 'grade_batch', return_value=mock_results):
+    with patch.object(grader.grader, "grade_batch", return_value=mock_results):
         runnable = grader.as_runnable()
         result_state = runnable.invoke(state)
 
@@ -188,15 +173,13 @@ def test_grader_runnable_with_state():
 
 # ==================== ROBUST GRADER TESTS ====================
 
+
 def test_grading_result_dataclass():
     """Test GradingResult dataclass."""
     from src.agent.nodes.robust_grader import GradingResult, RelevanceScore
 
     result = GradingResult(
-        score=RelevanceScore.RELEVANT,
-        confidence=0.85,
-        reason="Test reason",
-        method="llm"
+        score=RelevanceScore.RELEVANT, confidence=0.85, reason="Test reason", method="llm"
     )
 
     assert result.score == RelevanceScore.RELEVANT
@@ -226,10 +209,7 @@ def test_grading_result_to_dict():
     from src.agent.nodes.robust_grader import GradingResult, RelevanceScore
 
     result = GradingResult(
-        score=RelevanceScore.HIGHLY_RELEVANT,
-        confidence=0.95,
-        reason="Very relevant",
-        method="llm"
+        score=RelevanceScore.HIGHLY_RELEVANT, confidence=0.95, reason="Very relevant", method="llm"
     )
 
     d = result.to_dict()
@@ -250,11 +230,12 @@ def test_robust_grader_initialization():
     assert grader.model_name == "phi3:mini"
 
 
-@patch('src.agent.nodes.robust_grader.get_semantic_model')
+@patch("src.agent.nodes.robust_grader.get_semantic_model")
 def test_robust_grader_grade_document(mock_semantic_model):
     """Test grading a single document."""
-    from src.agent.nodes.robust_grader import RobustGrader
     import numpy as np
+
+    from src.agent.nodes.robust_grader import RobustGrader
 
     # Mock semantic model
     mock_model = Mock()
@@ -264,25 +245,26 @@ def test_robust_grader_grade_document(mock_semantic_model):
     grader = RobustGrader(model_name="phi3:mini")
 
     # Mock LLM grading
-    with patch.object(grader, '_grade_with_llm') as mock_llm:
+    with patch.object(grader, "_grade_with_llm") as mock_llm:
         from src.agent.nodes.robust_grader import RelevanceScore
+
         mock_llm.return_value = RelevanceScore.RELEVANT
 
         result = grader.grade(
-            question="What is Python?",
-            document="Python is a programming language"
+            question="What is Python?", document="Python is a programming language"
         )
 
     assert result is not None
-    assert hasattr(result, 'score')
-    assert hasattr(result, 'confidence')
+    assert hasattr(result, "score")
+    assert hasattr(result, "confidence")
 
 
-@patch('src.agent.nodes.robust_grader.get_semantic_model')
+@patch("src.agent.nodes.robust_grader.get_semantic_model")
 def test_robust_grader_batch_grading(mock_semantic_model):
     """Test batch grading multiple documents."""
-    from src.agent.nodes.robust_grader import RobustGrader, RelevanceScore
     import numpy as np
+
+    from src.agent.nodes.robust_grader import RelevanceScore, RobustGrader
 
     # Mock semantic model
     mock_model = Mock()
@@ -294,29 +276,29 @@ def test_robust_grader_batch_grading(mock_semantic_model):
     documents = [
         "Python is a programming language",
         "Weather is sunny",
-        "Machine learning uses Python"
+        "Machine learning uses Python",
     ]
 
-    with patch.object(grader, '_grade_with_llm', return_value=RelevanceScore.RELEVANT):
+    with patch.object(grader, "_grade_with_llm", return_value=RelevanceScore.RELEVANT):
         results = grader.grade_batch("What is Python?", documents)
 
     assert len(results) == 3
-    assert all(hasattr(r, 'confidence') for r in results)
+    assert all(hasattr(r, "confidence") for r in results)
 
 
 def test_robust_grader_fallback_on_llm_failure():
     """Test fallback mechanism when LLM fails."""
     from src.agent.nodes.robust_grader import RobustGrader
-    import numpy as np
 
     grader = RobustGrader(model_name="phi3:mini")
 
     # Mock LLM to fail
-    with patch.object(grader, '_grade_with_llm', side_effect=Exception("LLM Error")), \
-         patch.object(grader, '_semantic_similarity', return_value=0.7), \
-         patch.object(grader, '_keyword_fallback', return_value=0.6), \
-         patch('src.agent.nodes.robust_grader.get_semantic_model'):
-
+    with (
+        patch.object(grader, "_grade_with_llm", side_effect=Exception("LLM Error")),
+        patch.object(grader, "_semantic_similarity", return_value=0.7),
+        patch.object(grader, "_keyword_fallback", return_value=0.6),
+        patch("src.agent.nodes.robust_grader.get_semantic_model"),
+    ):
         result = grader.grade("test question", "test document")
 
         # Should fall back to semantic/keyword
@@ -325,10 +307,11 @@ def test_robust_grader_fallback_on_llm_failure():
 
 # ==================== INTEGRATION TESTS ====================
 
+
 def test_grader_node_with_state_no_documents():
     """Test grader handling state with no documents."""
-    from src.agent.nodes.grader_node import GraderNode
     from src.agent.graph_state import GraphState
+    from src.agent.nodes.grader_node import GraderNode
 
     grader = GraderNode()
 
@@ -342,7 +325,7 @@ def test_grader_node_with_state_no_documents():
         needs_rewrite=False,
         confidence=0.0,
         history=[],
-        metadata={}
+        metadata={},
     )
 
     runnable = grader.as_runnable()
@@ -355,8 +338,8 @@ def test_grader_node_with_state_no_documents():
 
 def test_grader_sets_needs_rewrite():
     """Test that grader sets needs_rewrite flag."""
-    from src.agent.nodes.grader_node import GraderNode
     from src.agent.graph_state import GraphState
+    from src.agent.nodes.grader_node import GraderNode
     from src.agent.nodes.robust_grader import GradingResult, RelevanceScore
 
     grader = GraderNode(confidence_threshold=0.7)
@@ -371,15 +354,13 @@ def test_grader_sets_needs_rewrite():
         needs_rewrite=False,
         confidence=0.0,
         history=[],
-        metadata={}
+        metadata={},
     )
 
     # Mock all documents as not relevant
-    mock_results = [
-        GradingResult(RelevanceScore.NOT_RELEVANT, 0.2, "Not relevant", "llm")
-    ]
+    mock_results = [GradingResult(RelevanceScore.NOT_RELEVANT, 0.2, "Not relevant", "llm")]
 
-    with patch.object(grader.grader, 'grade_batch', return_value=mock_results):
+    with patch.object(grader.grader, "grade_batch", return_value=mock_results):
         runnable = grader.as_runnable()
         result = runnable.invoke(state)
 
@@ -389,8 +370,8 @@ def test_grader_sets_needs_rewrite():
 
 def test_grader_updates_history():
     """Test that grader updates history."""
-    from src.agent.nodes.grader_node import GraderNode
     from src.agent.graph_state import GraphState
+    from src.agent.nodes.grader_node import GraderNode
     from src.agent.nodes.robust_grader import GradingResult, RelevanceScore
 
     grader = GraderNode()
@@ -405,14 +386,12 @@ def test_grader_updates_history():
         needs_rewrite=False,
         confidence=0.0,
         history=[],
-        metadata={}
+        metadata={},
     )
 
-    mock_results = [
-        GradingResult(RelevanceScore.RELEVANT, 0.8, "Relevant", "llm")
-    ]
+    mock_results = [GradingResult(RelevanceScore.RELEVANT, 0.8, "Relevant", "llm")]
 
-    with patch.object(grader.grader, 'grade_batch', return_value=mock_results):
+    with patch.object(grader.grader, "grade_batch", return_value=mock_results):
         runnable = grader.as_runnable()
         result = runnable.invoke(state)
 
@@ -423,6 +402,7 @@ def test_grader_updates_history():
 
 # ==================== PERFORMANCE TESTS ====================
 
+
 def test_grader_performance(performance_timer):
     """Test grader performance with multiple documents."""
     from src.agent.nodes.grader_node import GraderNode
@@ -432,19 +412,14 @@ def test_grader_performance(performance_timer):
 
     documents = [f"Document {i}" for i in range(20)]
 
-    mock_results = [
-        GradingResult(RelevanceScore.RELEVANT, 0.7, "Test", "llm")
-        for _ in range(20)
-    ]
+    mock_results = [GradingResult(RelevanceScore.RELEVANT, 0.7, "Test", "llm") for _ in range(20)]
 
-    with patch.object(grader.grader, 'grade_batch', return_value=mock_results):
+    with patch.object(grader.grader, "grade_batch", return_value=mock_results):
         with performance_timer() as timer:
-            result = grader.grade_documents(
-                question="Test",
-                documents=documents
-            )
+            result = grader.grade_documents(question="Test", documents=documents)
 
         # Mocked should be fast
+        assert result is not None
         assert timer.elapsed < 5.0
 
 

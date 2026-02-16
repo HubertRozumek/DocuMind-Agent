@@ -1,11 +1,11 @@
-import logging
 import json
-import time
+import logging
 import re
-from typing import Dict, Any, List, Optional, Tuple
+import threading
+import time
 from dataclasses import dataclass
 from enum import Enum
-import threading
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -42,14 +42,14 @@ def get_semantic_model():
         _model_loading = True
 
         try:
-            from sentence_transformers import SentenceTransformer
             import torch
+            from sentence_transformers import SentenceTransformer
 
             logger.info("Loading semantic model (singleton)...")
 
             if torch.cuda.is_available():
                 device = "cuda"
-            elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
                 device = "mps"
             else:
                 device = "cpu"
@@ -57,8 +57,7 @@ def get_semantic_model():
             logger.info(f"Using device: {device}")
 
             _semantic_model_instance = SentenceTransformer(
-                'sentence-transformers/all-mpnet-base-v2',
-                device=device
+                "sentence-transformers/all-mpnet-base-v2", device=device
             )
 
             logger.info("Semantic model loaded successfully")
@@ -84,6 +83,7 @@ class RelevanceScore(Enum):
         WEAKLY_RELEVANT: Marginally related
         NOT_RELEVANT: Unrelated to the question
     """
+
     HIGHLY_RELEVANT = 5
     RELEVANT = 4
     SOMEWHAT_RELEVANT = 3
@@ -102,6 +102,7 @@ class GradingResult:
         reason: Human-readable explanation of the grading
         method: Grading method used ("llm", "fallback_keyword", "fallback_semantic")
     """
+
     score: RelevanceScore
     confidence: float
     reason: str
@@ -148,7 +149,7 @@ class GradingResult:
             "reason": self.reason,
             "score": self.score.name,
             "score_value": self.score.value,
-            "method": self.method
+            "method": self.method,
         }
 
 
@@ -172,6 +173,7 @@ class GraderConfig:
         relevance_threshold: Default threshold for is_relevant() method
         skip_fallback_on_clear_verdict: Skip fallbacks if LLM confidence is clear
     """
+
     llm_min_confidence: float = 0.6
     llm_retry_count: int = 2
     semantic_highly_relevant: float = 0.75
@@ -241,17 +243,22 @@ class RobustGrader:
 
             if self.config.skip_fallback_on_clear_verdict:
                 if llm_result.confidence >= 0.85 or llm_result.confidence <= 0.15:
-                    logger.info(f"LLM confidence clear ({llm_result.confidence:.2f}), skipping fallback")
+                    logger.info(
+                        f"LLM confidence clear ({llm_result.confidence:.2f}), skipping fallback"
+                    )
                     return llm_result
 
             if llm_result.confidence >= self.config.llm_min_confidence:
-                logger.info(f"LLM confidence sufficient ({llm_result.confidence:.2f}), using LLM result")
+                logger.info(
+                    f"LLM confidence sufficient ({llm_result.confidence:.2f}), using LLM result"
+                )
                 return llm_result
 
             if metadata and metadata.get("source_type") == "policy":
                 boosted_confidence = min(0.9, llm_result.confidence * 1.2)
                 if boosted_confidence >= self.config.llm_min_confidence:
                     from dataclasses import replace
+
                     boosted_result = replace(llm_result, confidence=boosted_confidence)
                     logger.info(f"Boosted confidence for policy: {boosted_confidence:.2f}")
                     return boosted_result
@@ -264,7 +271,9 @@ class RobustGrader:
         try:
             semantic_result = self._semantic_similarity(question, document)
             if semantic_result.confidence >= self.config.fallback_min_threshold:
-                logger.info(f"Using semantic fallback with confidence {semantic_result.confidence:.2f}")
+                logger.info(
+                    f"Using semantic fallback with confidence {semantic_result.confidence:.2f}"
+                )
                 return semantic_result
         except Exception as e:
             logger.warning(f"Semantic fallback failed: {e}")
@@ -294,7 +303,7 @@ class RobustGrader:
 
         Rating scale:
         5 = Document perfectly answers the question
-        4 = Document partially answers the question  
+        4 = Document partially answers the question
         3 = Document is related but doesn't directly answer
         2 = Document is weakly related
         1 = Document is unrelated
@@ -306,13 +315,13 @@ class RobustGrader:
           "explanation": "One sentence why this rating"
         }"""
 
-        doc_preview = document[:1500].replace('"', '\\"').replace('\n', ' ')
+        doc_preview = document[:1500].replace('"', '\\"').replace("\n", " ")
 
         user_prompt = f"""QUESTION TO EVALUATE AGAINST: "{question}"
 
         DOCUMENT TO EVALUATE: "{doc_preview}"
 
-        Remember: You are EVALUATING, not ANSWERING. 
+        Remember: You are EVALUATING, not ANSWERING.
         Rate how well DOCUMENT helps answer QUESTION.
 
         JSON output:"""
@@ -337,6 +346,7 @@ class RobustGrader:
 
         try:
             from src.agent.nodes.grader_model import OllamaGrader
+
             ollama = OllamaGrader(model_name=self.model_name)
 
             response = ollama.grade(user, system_prompt=system)
@@ -390,13 +400,15 @@ class RobustGrader:
             }
             score = score_map.get(rating, RelevanceScore.SOMEWHAT_RELEVANT)
 
-            logger.info(f"[LLM Result] rating={rating}, confidence={confidence}, score={score.name}")
+            logger.info(
+                f"[LLM Result] rating={rating}, confidence={confidence}, score={score.name}"
+            )
 
             return GradingResult(
                 score=score,
                 confidence=confidence,
                 reason=parsed.get("explanation", parsed.get("reason", "LLM graded")),
-                method="llm"
+                method="llm",
             )
 
         except Exception as e:
@@ -421,11 +433,11 @@ class RobustGrader:
             Parsed dictionary or None if extraction fails
         """
         patterns = [
-            r'```json\s*(\{.*?\})\s*```',
-            r'```\s*(\{.*?\})\s*```',
+            r"```json\s*(\{.*?\})\s*```",
+            r"```\s*(\{.*?\})\s*```",
             r'(\{[^{}]*"rating"[^{}]*\})',
             r'(\{[^{}]*"relevant"[^{}]*\})',
-            r'(\{.*\})',
+            r"(\{.*\})",
         ]
 
         for pattern in patterns:
@@ -433,8 +445,8 @@ class RobustGrader:
             for match in matches:
                 try:
                     cleaned = match.strip()
-                    cleaned = re.sub(r',\s*}', '}', cleaned)
-                    cleaned = re.sub(r'\n\s*', ' ', cleaned)
+                    cleaned = re.sub(r",\s*}", "}", cleaned)
+                    cleaned = re.sub(r"\n\s*", " ", cleaned)
                     return json.loads(cleaned)
                 except json.JSONDecodeError:
                     continue
@@ -473,12 +485,11 @@ class RobustGrader:
         Returns:
             GradingResult with semantic similarity score
         """
-        from sentence_transformers import SentenceTransformer
         import numpy as np
 
         try:
             model = get_semantic_model()
-            if not hasattr(self, '_question_cache'):
+            if not hasattr(self, "_question_cache"):
                 self._question_cache = {}
 
             if question not in self._question_cache:
@@ -487,7 +498,7 @@ class RobustGrader:
             q_embedding = self._question_cache[question]
             d_embedding = model.encode([document])[0]
             similarity = np.dot(q_embedding, d_embedding) / (
-                    np.linalg.norm(q_embedding) * np.linalg.norm(d_embedding)
+                np.linalg.norm(q_embedding) * np.linalg.norm(d_embedding)
             )
 
             if similarity > self.config.semantic_highly_relevant:
@@ -508,7 +519,7 @@ class RobustGrader:
                 score=score,
                 confidence=adjusted_confidence,
                 reason=f"Semantic similarity: {similarity:.2f} (fallback)",
-                method="fallback_semantic"
+                method="fallback_semantic",
             )
 
         except Exception as e:
@@ -531,10 +542,10 @@ class RobustGrader:
         """
         import re
 
-        stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for'}
+        stop_words = {"the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for"}
 
         def extract_keywords(text: str) -> set:
-            words = re.findall(r'\b\w{4,}\b', text.lower())
+            words = re.findall(r"\b\w{4,}\b", text.lower())
             return set(w for w in words if w not in stop_words)
 
         q_keywords = extract_keywords(question)
@@ -545,7 +556,7 @@ class RobustGrader:
                 score=RelevanceScore.NOT_RELEVANT,
                 confidence=0.1,
                 reason="No valid keywords in question",
-                method="fallback_keyword"
+                method="fallback_keyword",
             )
 
         overlap = q_keywords & d_keywords
@@ -570,7 +581,7 @@ class RobustGrader:
             score=score,
             confidence=float(adjusted_coverage),
             reason=f"Keyword coverage: {len(overlap)}/{len(q_keywords)} words (adjusted: {adjusted_coverage:.2f})",
-            method="fallback_keyword"
+            method="fallback_keyword",
         )
 
     def grade_batch(self, question: str, documents: List[str]) -> List[GradingResult]:
@@ -596,7 +607,7 @@ class RobustGrader:
 
             if result.score == RelevanceScore.HIGHLY_RELEVANT and result.confidence > 0.9:
                 logger.info("Found highly relevant document, skipping remaining")
-                for remaining_doc in documents[i + 1:]:
+                for remaining_doc in documents[i + 1 :]:
                     quick = self._keyword_fallback(question, remaining_doc)
                     results.append(quick)
                 break
