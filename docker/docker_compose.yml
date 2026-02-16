@@ -1,0 +1,177 @@
+# ============================================
+# DocuMind-Agent Docker Compose Configuration
+# ============================================
+
+services:
+  # ============================================
+  # Ollama - Local LLM Server
+  # ============================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: documind-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - documind-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    # Note: Remove the deploy section if you don't have GPU
+
+  # ============================================
+  # Ollama Model Downloader (Init Container)
+  # ============================================
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: documind-ollama-init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ollama_data:/root/.ollama
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        echo "Pulling required models..."
+        ollama pull phi3:mini
+        ollama pull llama3.1:8b
+        ollama pull mistral:7b
+        echo "Models downloaded successfully!"
+    networks:
+      - documind-network
+    restart: "no"
+
+  # ============================================
+  # ChromaDB - Vector Database (Optional)
+  # ============================================
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: documind-chromadb
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=8000
+      - ALLOW_RESET=true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - documind-network
+
+  # ============================================
+  # DocuMind Application
+  # ============================================
+  documind:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: application
+    container_name: documind-app
+    ports:
+      - "8501:8501"
+    volumes:
+      # Application data
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./logs:/app/logs
+      # Source code (for development)
+      # - ./src:/app/src
+      # - ./streamlit_app:/app/streamlit_app
+    environment:
+      # Ollama Configuration
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_GRADER_MODEL=phi3:mini
+      - OLLAMA_GENERATOR_MODEL=llama3.1:8b
+      - OLLAMA_REWRITER_MODEL=mistral:7b
+
+      # Vector Store Configuration
+      - CHROMA_PERSIST_DIR=/app/data/vector_store/chroma
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+
+      # App Configuration
+      - LOG_LEVEL=INFO
+      - ENABLE_TOOLS=true
+      - MAX_ITERATIONS=3
+    depends_on:
+      ollama:
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
+      chromadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - documind-network
+    restart: unless-stopped
+
+  # ============================================
+  # Development Environment (Optional)
+  # ============================================
+  documind-dev:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: development
+    container_name: documind-dev
+    profiles:
+      - dev
+    ports:
+      - "8502:8501"
+    volumes:
+      - ./src:/app/src
+      - ./streamlit_app:/app/streamlit_app
+      - ./tests:/app/tests
+      - ./data:/app/data
+      - ./models:/app/models
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+    depends_on:
+      - ollama
+      - chromadb
+    networks:
+      - documind-network
+    command: ["streamlit", "run", "streamlit_app/app.py", "--server.port=8501"]
+
+# ============================================
+# Networks
+# ============================================
+networks:
+  documind-network:
+    driver: bridge
+
+# ============================================
+# Volumes
+# ============================================
+volumes:
+  ollama_data:
+    driver: local
+  chroma_data:
+    driver: local
