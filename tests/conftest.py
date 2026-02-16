@@ -5,12 +5,12 @@ This file contains reusable fixtures for creating test data,
 temporary files, mock objects, and test configurations.
 """
 
-import pytest
-import tempfile
-import shutil
-from pathlib import Path
-from typing import List, Dict, Any
 import logging
+import shutil
+import tempfile
+from pathlib import Path
+
+import pytest
 
 # Suppress warnings during tests
 logging.getLogger("chromadb").setLevel(logging.ERROR)
@@ -18,6 +18,7 @@ logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
 
 
 # ==================== PDF GENERATION FIXTURES ====================
+
 
 @pytest.fixture
 def temp_dir():
@@ -46,9 +47,7 @@ def create_test_pdf():
     created_files = []
 
     def _create_pdf(
-            content: str = "Test document content",
-            num_pages: int = 1,
-            filename: str = "test.pdf"
+        content: str = "Test document content", num_pages: int = 1, filename: str = "test.pdf"
     ) -> Path:
         """
         Create a PDF file with specified content.
@@ -62,8 +61,8 @@ def create_test_pdf():
             Path to created PDF
         """
         from reportlab.lib.pagesizes import letter
-        from reportlab.pdfgen import canvas
         from reportlab.lib.units import inch
+        from reportlab.pdfgen import canvas
 
         # Create in temp directory
         temp_dir = Path(tempfile.mkdtemp())
@@ -82,7 +81,7 @@ def create_test_pdf():
             text_object.setFont("Helvetica", 12)
 
             # Split content into lines
-            lines = page_content.split('\n')
+            lines = page_content.split("\n")
             for line in lines:
                 text_object.textLine(line)
 
@@ -197,14 +196,15 @@ def multiple_pdfs(create_test_pdf):
 
 # ==================== TEXT FIXTURES ====================
 
+
 @pytest.fixture
 def sample_text():
     """Sample text for text splitter tests."""
     return """
     Introduction to Machine Learning
 
-    Machine learning is a subset of artificial intelligence that focuses on 
-    building systems that can learn from data. It has revolutionized many 
+    Machine learning is a subset of artificial intelligence that focuses on
+    building systems that can learn from data. It has revolutionized many
     industries including healthcare, finance, and technology.
 
     Types of Machine Learning:
@@ -213,13 +213,13 @@ def sample_text():
     2. Unsupervised Learning: Finds patterns in unlabeled data
     3. Reinforcement Learning: Learns through interaction with environment
 
-    Applications of machine learning are vast and growing. From recommendation 
-    systems to autonomous vehicles, ML is transforming how we interact with 
+    Applications of machine learning are vast and growing. From recommendation
+    systems to autonomous vehicles, ML is transforming how we interact with
     technology. The field continues to evolve with new algorithms and techniques.
 
-    Deep learning, a subset of machine learning, uses neural networks with 
-    multiple layers. These networks can learn hierarchical representations of 
-    data, making them particularly effective for tasks like image recognition 
+    Deep learning, a subset of machine learning, uses neural networks with
+    multiple layers. These networks can learn hierarchical representations of
+    data, making them particularly effective for tasks like image recognition
     and natural language processing.
 
     Conclusion: Machine learning will continue to shape the future of technology.
@@ -270,30 +270,31 @@ class DataProcessor:
 
 # ==================== DOCUMENT FIXTURES ====================
 
+
 @pytest.fixture
 def sample_documents():
     """Sample documents for retriever/grader tests."""
     return [
         {
             "text": "Python is a high-level programming language. It emphasizes code readability.",
-            "metadata": {"source": "doc1", "page": 1, "topic": "programming"}
+            "metadata": {"source": "doc1", "page": 1, "topic": "programming"},
         },
         {
             "text": "Machine learning models require large amounts of training data to achieve good performance.",
-            "metadata": {"source": "doc2", "page": 1, "topic": "ml"}
+            "metadata": {"source": "doc2", "page": 1, "topic": "ml"},
         },
         {
             "text": "The weather today is sunny with clear skies. Perfect for outdoor activities.",
-            "metadata": {"source": "doc3", "page": 1, "topic": "weather"}
+            "metadata": {"source": "doc3", "page": 1, "topic": "weather"},
         },
         {
             "text": "Deep learning uses neural networks with multiple layers to learn representations.",
-            "metadata": {"source": "doc4", "page": 1, "topic": "ml"}
+            "metadata": {"source": "doc4", "page": 1, "topic": "ml"},
         },
         {
             "text": "Python's simplicity and extensive libraries make it popular for data science.",
-            "metadata": {"source": "doc5", "page": 1, "topic": "programming"}
-        }
+            "metadata": {"source": "doc5", "page": 1, "topic": "programming"},
+        },
     ]
 
 
@@ -301,7 +302,7 @@ def sample_documents():
 def chunked_documents():
     """Pre-chunked documents for vector store tests."""
     from dataclasses import dataclass
-    from typing import Dict, Any
+    from typing import Any, Dict
 
     @dataclass
     class MockChunk:
@@ -313,22 +314,23 @@ def chunked_documents():
         MockChunk(
             text="Python is a versatile programming language",
             metadata={"source": "doc1", "chunk_index": 0},
-            chunk_id="doc1_0"
+            chunk_id="doc1_0",
         ),
         MockChunk(
             text="Machine learning is transforming technology",
             metadata={"source": "doc2", "chunk_index": 0},
-            chunk_id="doc2_0"
+            chunk_id="doc2_0",
         ),
         MockChunk(
             text="Data science requires statistical knowledge",
             metadata={"source": "doc3", "chunk_index": 0},
-            chunk_id="doc3_0"
-        )
+            chunk_id="doc3_0",
+        ),
     ]
 
 
 # ==================== CONFIGURATION FIXTURES ====================
+
 
 @pytest.fixture
 def vector_store_config(temp_dir):
@@ -336,27 +338,20 @@ def vector_store_config(temp_dir):
     return {
         "collection_name": "test_collection",
         "persist_directory": str(temp_dir / "chroma_test"),
-        "reset_on_start": True
+        "reset_on_start": True,
     }
 
 
 @pytest.fixture
 def grader_config():
     """Configuration for grader tests."""
-    return {
-        "grader_type": "robust",
-        "confidence_threshold": 0.6,
-        "model_name": "phi3:mini"
-    }
+    return {"grader_type": "robust", "confidence_threshold": 0.6, "model_name": "phi3:mini"}
 
 
 @pytest.fixture
 def generator_config():
     """Configuration for generator tests."""
-    return {
-        "model_name": "phi3:mini",
-        "temperature": 0.1
-    }
+    return {"model_name": "phi3:mini", "temperature": 0.1}
 
 
 @pytest.fixture
@@ -367,17 +362,19 @@ def agent_config(vector_store_config, grader_config, generator_config):
         "grader_config": grader_config,
         "generator_config": generator_config,
         "max_iterations": 2,
-        "use_tools": False  # Disable for testing
+        "use_tools": False,  # Disable for testing
     }
 
 
 # ==================== MOCK FIXTURES ====================
+
 
 @pytest.fixture
 def mock_embedding_function():
     """Mock embedding function for tests."""
 
     from src.vector_store.embeddings_manager import EmbeddingManager
+
     embedding_manager = EmbeddingManager()
 
     return embedding_manager.chroma_embedding_function()
@@ -399,6 +396,7 @@ def mock_llm_response():
 
 
 # ==================== UTILITY FIXTURES ====================
+
 
 @pytest.fixture
 def capture_logs():
@@ -426,6 +424,7 @@ def reset_logging():
 
 
 # ==================== PERFORMANCE FIXTURES ====================
+
 
 @pytest.fixture
 def performance_timer():
