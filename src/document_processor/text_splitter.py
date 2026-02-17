@@ -63,7 +63,7 @@ class TextSplitter:
         self,
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
-        strategy: str = "token",
+        strategy: str = "recursive",
         length_function: str = "len",
         separators: Optional[List[str]] = None,
         min_chunk_size: int = 50,

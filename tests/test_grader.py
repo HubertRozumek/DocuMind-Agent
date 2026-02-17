@@ -54,9 +54,7 @@ def test_grade_single_document():
     )
 
     with patch.object(grader.grader, "grade", return_value=mock_result):
-        result = grader.grade_document(
-            question="What is Python?", document="Python is a programming language"
-        )
+        result = grader.grade_document(question="What is Python?", document="Python is a programming language")
 
     assert isinstance(result, dict)
     assert "confidence" in result
@@ -178,9 +176,7 @@ def test_grading_result_dataclass():
     """Test GradingResult dataclass."""
     from src.agent.nodes.robust_grader import GradingResult, RelevanceScore
 
-    result = GradingResult(
-        score=RelevanceScore.RELEVANT, confidence=0.85, reason="Test reason", method="llm"
-    )
+    result = GradingResult(score=RelevanceScore.RELEVANT, confidence=0.85, reason="Test reason", method="llm")
 
     assert result.score == RelevanceScore.RELEVANT
     assert result.confidence == 0.85
@@ -208,9 +204,7 @@ def test_grading_result_to_dict():
     """Test converting GradingResult to dict."""
     from src.agent.nodes.robust_grader import GradingResult, RelevanceScore
 
-    result = GradingResult(
-        score=RelevanceScore.HIGHLY_RELEVANT, confidence=0.95, reason="Very relevant", method="llm"
-    )
+    result = GradingResult(score=RelevanceScore.HIGHLY_RELEVANT, confidence=0.95, reason="Very relevant", method="llm")
 
     d = result.to_dict()
 
@@ -250,9 +244,7 @@ def test_robust_grader_grade_document(mock_semantic_model):
 
         mock_llm.return_value = RelevanceScore.RELEVANT
 
-        result = grader.grade(
-            question="What is Python?", document="Python is a programming language"
-        )
+        result = grader.grade(question="What is Python?", document="Python is a programming language")
 
     assert result is not None
     assert hasattr(result, "score")

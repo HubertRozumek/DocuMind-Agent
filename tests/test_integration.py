@@ -17,9 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # ==================== FULL PIPELINE TESTS ====================
 
 
-def test_pdf_to_vector_store_pipeline(
-    create_test_pdf, vector_store_config, mock_embedding_function
-):
+def test_pdf_to_vector_store_pipeline(create_test_pdf, vector_store_config, mock_embedding_function):
     """Test complete pipeline: PDF -> Chunks -> Vector Store."""
     from src.document_processor.pdf_loader import PDFLoader
     from src.document_processor.text_splitter import TextSplitter
@@ -110,9 +108,7 @@ def test_retrieval_pipeline(vector_store_config, mock_embedding_function):
     vector_store.add_documents(docs)
 
     # Create retriever
-    retriever = RetrieverNode(
-        vector_store=vector_store, search_config={"k": 3, "score_threshold": 0.5}
-    )
+    retriever = RetrieverNode(vector_store=vector_store, search_config={"k": 3, "score_threshold": 0.5})
 
     # Create state
     state = GraphState(
@@ -184,10 +180,7 @@ def test_retrieval_and_grading_pipeline(vector_store_config, mock_embedding_func
     assert len(state["documents"]) > 0
 
     # Step 2: Grade
-    mock_results = [
-        GradingResult(RelevanceScore.RELEVANT, 0.9, "Relevant", "llm")
-        for _ in range(len(state["documents"]))
-    ]
+    mock_results = [GradingResult(RelevanceScore.RELEVANT, 0.9, "Relevant", "llm") for _ in range(len(state["documents"]))]
 
     with patch.object(grader.grader, "grade_batch", return_value=mock_results):
         grader_runnable = grader.as_runnable()
@@ -230,10 +223,7 @@ def test_multi_document_processing(multiple_pdfs, vector_store_config, mock_embe
         reset_on_start=True,
     )
 
-    docs_to_add = [
-        {"id": chunk.chunk_id, "text": chunk.text, "metadata": chunk.metadata}
-        for chunk in all_chunks
-    ]
+    docs_to_add = [{"id": chunk.chunk_id, "text": chunk.text, "metadata": chunk.metadata} for chunk in all_chunks]
 
     count = vector_store.add_documents(docs_to_add)
 
@@ -310,9 +300,7 @@ def test_grader_handles_empty_documents():
 # ==================== PERFORMANCE TESTS ====================
 
 
-def test_full_pipeline_performance(
-    create_test_pdf, vector_store_config, mock_embedding_function, performance_timer
-):
+def test_full_pipeline_performance(create_test_pdf, vector_store_config, mock_embedding_function, performance_timer):
     """Test full pipeline performance."""
     from src.agent.graph_state import GraphState
     from src.agent.nodes.retriever_node import RetrieverNode
@@ -341,10 +329,7 @@ def test_full_pipeline_performance(
             reset_on_start=True,
         )
 
-        docs_to_add = [
-            {"id": chunk.chunk_id, "text": chunk.text, "metadata": chunk.metadata}
-            for chunk in chunks
-        ]
+        docs_to_add = [{"id": chunk.chunk_id, "text": chunk.text, "metadata": chunk.metadata} for chunk in chunks]
         vector_store.add_documents(docs_to_add)
 
         # Retrieve
@@ -371,9 +356,7 @@ def test_full_pipeline_performance(
 # ==================== DATA CONSISTENCY TESTS ====================
 
 
-def test_metadata_consistency_through_pipeline(
-    create_test_pdf, vector_store_config, mock_embedding_function
-):
+def test_metadata_consistency_through_pipeline(create_test_pdf, vector_store_config, mock_embedding_function):
     """Test that metadata is preserved through entire pipeline."""
     from src.document_processor.pdf_loader import PDFLoader
     from src.document_processor.text_splitter import TextSplitter
@@ -400,9 +383,7 @@ def test_metadata_consistency_through_pipeline(
         reset_on_start=True,
     )
 
-    docs_to_add = [
-        {"id": chunk.chunk_id, "text": chunk.text, "metadata": chunk.metadata} for chunk in chunks
-    ]
+    docs_to_add = [{"id": chunk.chunk_id, "text": chunk.text, "metadata": chunk.metadata} for chunk in chunks]
     vector_store.add_documents(docs_to_add)
 
     results = vector_store.search("Test", n_results=1)

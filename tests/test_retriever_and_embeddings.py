@@ -80,9 +80,7 @@ def test_retriever_node_initialization(vector_store_config, mock_embedding_funct
         reset_on_start=True,
     )
 
-    retriever = RetrieverNode(
-        vector_store=vector_store, search_config={"k": 3, "score_threshold": 0.5}
-    )
+    retriever = RetrieverNode(vector_store=vector_store, search_config={"k": 3, "score_threshold": 0.5})
 
     assert retriever.vector_store is not None
     assert retriever.search_config["k"] == 3
@@ -185,9 +183,7 @@ def test_retriever_with_score_threshold(vector_store_config, mock_embedding_func
     # Add some data
     vector_store.add_documents(docs_to_add)
 
-    retriever = RetrieverNode(
-        vector_store=vector_store, search_config={"k": 5, "score_threshold": 0.8}
-    )
+    retriever = RetrieverNode(vector_store=vector_store, search_config={"k": 5, "score_threshold": 0.8})
 
     state = GraphState(
         question="Query",

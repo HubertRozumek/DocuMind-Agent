@@ -46,9 +46,7 @@ def create_test_pdf():
     """
     created_files = []
 
-    def _create_pdf(
-        content: str = "Test document content", num_pages: int = 1, filename: str = "test.pdf"
-    ) -> Path:
+    def _create_pdf(content: str = "Test document content", num_pages: int = 1, filename: str = "test.pdf") -> Path:
         """
         Create a PDF file with specified content.
 

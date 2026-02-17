@@ -205,7 +205,7 @@ class ChromaDBVectorStore:
                 "documents": results["documents"][0] if results["documents"] else [],
                 "metadatas": results["metadatas"][0] if results["metadatas"] else [],
                 "distances": results["distances"][0] if results["distances"] else [],
-                "similarities": [1 - d for d in results["distances"][0]] if results["distances"] else [],
+                "similarities": ([1 - d for d in results["distances"][0]] if results["distances"] else []),
             }
             logger.info(f"Found {len(processed_results['ids'])} results for {query}")
             return processed_results
@@ -233,7 +233,7 @@ class ChromaDBVectorStore:
                 "documents": results["documents"][0] if results["documents"] else [],
                 "metadatas": results["metadatas"][0] if results["metadatas"] else [],
                 "distances": results["distances"][0] if results["distances"] else [],
-                "similarities": [1 - d for d in results["distances"][0]] if results["distances"] else [],
+                "similarities": ([1 - d for d in results["distances"][0]] if results["distances"] else []),
             }
             return processed_results
 

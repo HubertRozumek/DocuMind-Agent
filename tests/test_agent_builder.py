@@ -358,28 +358,20 @@ def test_agent_end_to_end_mock(mock_embedding, mock_vector_store, agent_config):
     # Setup mocks
     mock_embedding.return_value.chroma_embedding_function.return_value = Mock()
     mock_vs_instance = Mock()
-    mock_vs_instance.similarity_search.return_value = [
-        {"text": "Python is a language", "metadata": {}}
-    ]
+    mock_vs_instance.similarity_search.return_value = [{"text": "Python is a language", "metadata": {}}]
     mock_vector_store.return_value = mock_vs_instance
 
     agent = DocuMindAgent(**agent_config)
 
     # Mock all components
     agent.retriever = Mock()
-    agent.retriever.retrieve = Mock(
-        return_value={"documents": ["Python is a language"], "metadata": {}}
-    )
+    agent.retriever.retrieve = Mock(return_value={"documents": ["Python is a language"], "metadata": {}})
 
     agent.grader = Mock()
-    agent.grader.grade = Mock(
-        return_value={"relevant_docs": ["Python is a language"], "confidence": 0.8}
-    )
+    agent.grader.grade = Mock(return_value={"relevant_docs": ["Python is a language"], "confidence": 0.8})
 
     agent.generator = Mock()
-    agent.generator.generate = Mock(
-        return_value={"answer": "Python is a programming language", "confidence": 0.9}
-    )
+    agent.generator.generate = Mock(return_value={"answer": "Python is a programming language", "confidence": 0.9})
 
     # Mock graph
     mock_graph = Mock()

@@ -185,7 +185,7 @@ ci-test: ## Run tests as in CI
 ci-lint: ## Run linting as in CI
 	black --check src/ streamlit_app/ tests/
 	isort --check-only src/ streamlit_app/ tests/
-	flake8 src/ streamlit_app/ tests/ --max-line-length=150 --ignore=E203,W503
+	flake8 src/ streamlit_app/ tests/
 	#mypy src/ --ignore-missing-imports --python-version 3.11
 
 # ============================================

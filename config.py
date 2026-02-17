@@ -17,9 +17,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Get project root directory
-PROJECT_ROOT = (
-    Path(__file__).parent.parent if Path(__file__).parent.name == "src" else Path(__file__).parent
-)
+PROJECT_ROOT = Path(__file__).parent.parent if Path(__file__).parent.name == "src" else Path(__file__).parent
 
 
 @dataclass
@@ -36,9 +34,7 @@ class OllamaConfig:
 class VectorStoreConfig:
     """Vector store configuration."""
 
-    persist_dir: Path = field(
-        default_factory=lambda: Path(os.getenv("CHROMA_PERSIST_DIR", "data/vector_store/chroma"))
-    )
+    persist_dir: Path = field(default_factory=lambda: Path(os.getenv("CHROMA_PERSIST_DIR", "data/vector_store/chroma")))
     default_collection: str = os.getenv("CHROMA_DEFAULT_COLLECTION", "documents")
     host: str = os.getenv("CHROMA_HOST", "localhost")
     port: int = int(os.getenv("CHROMA_PORT", "8000"))
@@ -53,9 +49,7 @@ class EmbeddingConfig:
     """Embedding model configuration."""
 
     model_type: str = os.getenv("EMBEDDING_MODEL_TYPE", "MPNET")
-    cache_dir: Path = field(
-        default_factory=lambda: Path(os.getenv("EMBEDDING_CACHE_DIR", "models/cache"))
-    )
+    cache_dir: Path = field(default_factory=lambda: Path(os.getenv("EMBEDDING_CACHE_DIR", "models/cache")))
     device: Optional[str] = os.getenv("EMBEDDING_DEVICE", None)
 
     def __post_init__(self):
@@ -123,9 +117,7 @@ class SecurityConfig:
 
     api_key: Optional[str] = os.getenv("API_KEY", None)
     enable_auth: bool = os.getenv("ENABLE_AUTH", "false").lower() == "true"
-    allowed_origins: list = field(
-        default_factory=lambda: os.getenv("ALLOWED_ORIGINS", "http://localhost:8501").split(",")
-    )
+    allowed_origins: list = field(default_factory=lambda: os.getenv("ALLOWED_ORIGINS", "http://localhost:8501").split(","))
 
 
 @dataclass
@@ -133,11 +125,7 @@ class TestingConfig:
     """Testing configuration."""
 
     collection_name: str = os.getenv("TEST_COLLECTION_NAME", "test_collection")
-    persist_dir: Path = field(
-        default_factory=lambda: Path(
-            os.getenv("TEST_PERSIST_DIR", "tests/data/vector_store/chroma")
-        )
-    )
+    persist_dir: Path = field(default_factory=lambda: Path(os.getenv("TEST_PERSIST_DIR", "tests/data/vector_store/chroma")))
 
     def __post_init__(self):
         """Ensure test persist directory exists."""

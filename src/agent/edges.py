@@ -261,5 +261,5 @@ class EdgeRouter:
                 "retrieve": decisions.count("retrieve"),
                 "end": decisions.count("end") + decisions.count(END),
             },
-            "recent_decisions": self.edge_history[-5:] if len(self.edge_history) > 5 else self.edge_history,
+            "recent_decisions": (self.edge_history[-5:] if len(self.edge_history) > 5 else self.edge_history),
         }
