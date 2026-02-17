@@ -10,9 +10,10 @@ from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from dotenv import load_dotenv
+
 import chromadb
 import streamlit as st
+from dotenv import load_dotenv
 
 warnings.filterwarnings("ignore", message="Examining the path of torch.classes")
 
@@ -26,9 +27,7 @@ st.set_page_config(
 )
 
 # ==================== LOGGING SETUP ====================
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # ==================== PATH SETUP ====================
@@ -460,6 +459,7 @@ def get_available_collections() -> List[str]:
     client = get_chroma_client()
     return [c.name for c in client.list_collections()]
 
+
 @functools.lru_cache(maxsize=32)
 def get_collection_stats(collection_name: str) -> Dict[str, Any]:
     """Get statistics for a collection."""
@@ -607,10 +607,7 @@ def process_uploaded_files(files: List, collection_name: str) -> tuple[bool, str
         if not all_chunks:
             return False, "No chunks extracted from files"
 
-        docs_to_add = [
-            {"id": chunk.chunk_id, "text": chunk.text, "metadata": chunk.metadata}
-            for chunk in all_chunks
-        ]
+        docs_to_add = [{"id": chunk.chunk_id, "text": chunk.text, "metadata": chunk.metadata} for chunk in all_chunks]
 
         added_count = vector_store.add_documents(docs_to_add, batch_size=100)
 
@@ -694,11 +691,7 @@ def render_sidebar():
             selected = st.selectbox(
                 "Active Collection",
                 collections,
-                index=(
-                    collections.index(st.session_state.collection_name)
-                    if st.session_state.collection_name in collections
-                    else 0
-                ),
+                index=(collections.index(st.session_state.collection_name) if st.session_state.collection_name in collections else 0),
                 label_visibility="collapsed",
                 help="Select a knowledge base",
                 key="collection_selector",
@@ -729,9 +722,7 @@ def render_sidebar():
 
                 col1, col2 = st.columns(2)
                 with col1:
-                    if st.button(
-                        "Create", type="primary", use_container_width=True, key="create_btn"
-                    ):
+                    if st.button("Create", type="primary", use_container_width=True, key="create_btn"):
                         if new_name and new_name.replace("_", "").isalnum():
                             # Actually create the collection in ChromaDB
                             try:
@@ -771,10 +762,7 @@ def render_sidebar():
             with col2:
                 files = get_files_in_collection(st.session_state.collection_name)
                 st.markdown(
-                    f"<div class='stat-card'>"
-                    f"<div class='stat-value'>{len(files)}</div>"
-                    f"<div class='stat-label'>Files</div>"
-                    f"</div>",
+                    f"<div class='stat-card'>" f"<div class='stat-value'>{len(files)}</div>" f"<div class='stat-label'>Files</div>" f"</div>",
                     unsafe_allow_html=True,
                 )
 
@@ -791,13 +779,9 @@ def render_sidebar():
             )
 
             if uploaded:
-                if st.button(
-                    "📤 Process Files", use_container_width=True, type="primary", key="process_btn"
-                ):
+                if st.button("📤 Process Files", use_container_width=True, type="primary", key="process_btn"):
                     with st.spinner("Processing..."):
-                        success, message = process_uploaded_files(
-                            uploaded, st.session_state.collection_name
-                        )
+                        success, message = process_uploaded_files(uploaded, st.session_state.collection_name)
 
                         if success:
                             st.success(message)
@@ -969,9 +953,7 @@ def render_main_chat():
                     if not agent:
                         error_msg = st.session_state.last_error or "Failed to initialize agent"
                         message_placeholder.error(f"❌ {error_msg}")
-                        st.session_state.messages.append(
-                            {"role": "assistant", "content": f"❌ **Error:** {error_msg}"}
-                        )
+                        st.session_state.messages.append({"role": "assistant", "content": f"❌ **Error:** {error_msg}"})
                         return
 
                     # Generate response
@@ -1017,9 +999,7 @@ def render_main_chat():
 
                     message_placeholder.error(f"❌ {error_msg}")
 
-                    st.session_state.messages.append(
-                        {"role": "assistant", "content": f"❌ {error_msg}"}
-                    )
+                    st.session_state.messages.append({"role": "assistant", "content": f"❌ {error_msg}"})
 
 
 # ==================== MAIN APP ====================

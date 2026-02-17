@@ -1,10 +1,11 @@
-from typing import List, Dict, Any, Optional
-from typing_extensions import TypedDict
-from datetime import datetime
-import json
 import copy
-import numpy as np
+import json
 import logging
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+from typing_extensions import TypedDict
 
 logger = logging.getLogger(__name__)
 
@@ -123,10 +124,10 @@ class StateManager:
 
     @staticmethod
     def create_initial_state(
-            question: str,
-            vector_store_type: str = "chromadb",
-            search_threshold: float = 0.7,
-            max_iterations: int = 3
+        question: str,
+        vector_store_type: str = "chromadb",
+        search_threshold: float = 0.7,
+        max_iterations: int = 3,
     ) -> GraphState:
         """
         Create initial state for new conversation.
@@ -151,11 +152,7 @@ class StateManager:
             "current_document_index": 0,
             "needs_rewrite": False,
             "confidence": 0.0,
-            "history": [{
-                "role": "user",
-                "content": question,
-                "timestamp": datetime.now().isoformat()
-            }],
+            "history": [{"role": "user", "content": question, "timestamp": datetime.now().isoformat()}],
             "vector_store_type": vector_store_type,
             "search_threshold": search_threshold,
             "max_iterations": max_iterations,
@@ -163,10 +160,7 @@ class StateManager:
                 "created_at": datetime.now().isoformat(),
                 "session_id": f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
                 "vector_store": vector_store_type,
-                "search_params": {
-                    "threshold": search_threshold,
-                    "max_results": 5
-                },
+                "search_params": {"threshold": search_threshold, "max_results": 5},
             },
             "error": None,
             "rewritten_questions": [],
@@ -197,12 +191,12 @@ class StateManager:
         kwargs = sanitize_numpy_types(kwargs)
 
         preserved_keys = [
-            'rewritten_questions',
-            'current_rewrite_index',
-            'search_history',
-            'decision_log',
-            'tool_used',
-            'tool_result',
+            "rewritten_questions",
+            "current_rewrite_index",
+            "search_history",
+            "decision_log",
+            "tool_used",
+            "tool_result",
         ]
 
         for key, value in kwargs.items():
@@ -222,11 +216,11 @@ class StateManager:
 
         updated_state = sanitize_numpy_types(updated_state)
 
-        if 'rewritten_questions' in kwargs:
+        if "rewritten_questions" in kwargs:
             logger.info(f"[StateUpdate] rewritten_questions set: {len(kwargs['rewritten_questions'])} items")
-        if 'current_rewrite_index' in kwargs:
+        if "current_rewrite_index" in kwargs:
             logger.info(f"[StateUpdate] current_rewrite_index: {kwargs['current_rewrite_index']}")
-        if 'confidence' in kwargs:
+        if "confidence" in kwargs:
             logger.info(f"[StateUpdate] confidence updated: {kwargs['confidence']}")
 
         return updated_state
@@ -269,7 +263,7 @@ class StateManager:
         if not 0 <= state["confidence"] <= 1:
             warnings.append(f"Confidence must be between 0 and 1: {state['confidence']}")
 
-        supported_stores = ['chromadb']
+        supported_stores = ["chromadb"]
         if state["vector_store_type"] not in supported_stores:
             warnings.append(f"Vector store type '{state['vector_store_type']}' is not supported")
 
@@ -277,7 +271,7 @@ class StateManager:
             "is_valid": len(errors) == 0,
             "errors": errors,
             "warnings": warnings,
-            "state_summary": StateManager.get_state_summary(state)
+            "state_summary": StateManager.get_state_summary(state),
         }
 
     @staticmethod
@@ -347,7 +341,7 @@ class StateEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, datetime):
             return obj.isoformat()
-        if hasattr(obj, '__dict__'):
+        if hasattr(obj, "__dict__"):
             return obj.__dict__
         return super().default(obj)
 
@@ -381,6 +375,6 @@ def deserialize_state(state: str) -> GraphState:
         if "timestamp" in entry and isinstance(entry["timestamp"], str):
             try:
                 entry["timestamp"] = datetime.fromisoformat(entry["timestamp"])
-            except:
-                pass
+            except Exception as e:
+                logger.info(f"[Deserialize State]Failed to convert timestamp {e}")
     return data

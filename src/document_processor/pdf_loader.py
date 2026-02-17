@@ -5,18 +5,12 @@ from typing import Any, Dict, List
 logger = logging.getLogger(__name__)
 
 try:
-    from langchain_community.document_loaders import (
-        PyMuPDFLoader,
-        PyPDFLoader,
-        UnstructuredPDFLoader,
-    )
+    from langchain_community.document_loaders import PyMuPDFLoader, PyPDFLoader, UnstructuredPDFLoader
 
     LANGCHAIN_AVAILABLE = True
 except ImportError:
     LANGCHAIN_AVAILABLE = False
-    logger.warning(
-        "LangChain not available. Install with: " "pip install langchain langchain-community"
-    )
+    logger.warning("LangChain not available. Install with: " "pip install langchain langchain-community")
 
 
 class PDFLoader:
@@ -40,9 +34,7 @@ class PDFLoader:
             extract_images: Whether to extract images (only for unstructured)
         """
         if not LANGCHAIN_AVAILABLE:
-            raise ImportError(
-                "LangChain is required. Install with: " "pip install langchain langchain-community"
-            )
+            raise ImportError("LangChain is required. Install with: " "pip install langchain langchain-community")
 
         self.loader_type = loader_type
         self.extract_images = extract_images
@@ -135,9 +127,7 @@ class PDFLoader:
         - Slower than PyMuPDF
         """
         try:
-            loader = UnstructuredPDFLoader(
-                filepath, mode="elements" if self.extract_images else "single"
-            )
+            loader = UnstructuredPDFLoader(filepath, mode="elements" if self.extract_images else "single")
             documents = loader.load()
             logger.info(f"Loaded with Unstructured: {len(documents)} elements")
             return documents

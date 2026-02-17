@@ -1,27 +1,24 @@
 import logging
-from typing import Dict, Any
-from langgraph.graph import StateGraph, END
-from langgraph.checkpoint.memory import MemorySaver
-import chromadb
+from typing import Any, Dict
 
-from src.vector_store.embeddings_manager import EmbeddingManager
-from src.vector_store.chroma_db import ChromaDBVectorStore
+import chromadb
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import END, StateGraph
+
+from src.agent.edges import EdgeRouter, should_rewrite_again
 from src.agent.graph_state import GraphState
-from src.agent.nodes.retriever_node import RetrieverNode
+from src.agent.nodes.generator_node import GeneratorNode
 from src.agent.nodes.grader_node import GraderNode
 from src.agent.nodes.query_rewriter import QueryRewriter
-from src.agent.edges import EdgeRouter
-from src.agent.edges import should_rewrite_again
-from src.agent.nodes.generator_node import GeneratorNode
-from src.tools.document_tool import (
-    create_all_tools,
-    ToolRouter,
-    ToolErrorHandler,
-)
+from src.agent.nodes.retriever_node import RetrieverNode
+from src.tools.document_tool import ToolErrorHandler, ToolRouter, create_all_tools
+from src.vector_store.chroma_db import ChromaDBVectorStore
+from src.vector_store.embeddings_manager import EmbeddingManager
 
 logger = logging.getLogger(__name__)
 
 _chroma_client = None
+
 
 class DocuMindAgent:
     """
@@ -50,13 +47,13 @@ class DocuMindAgent:
     """
 
     def __init__(
-            self,
-            vector_store_config: Dict[str, Any] = None,
-            grader_config: Dict[str, Any] = None,
-            generator_config: Dict[str, Any] = None,
-            max_iterations: int = 3,
-            search_threshold: float = 0.7,
-            use_tools: bool = True,
+        self,
+        vector_store_config: Dict[str, Any] = None,
+        grader_config: Dict[str, Any] = None,
+        generator_config: Dict[str, Any] = None,
+        max_iterations: int = 3,
+        search_threshold: float = 0.7,
+        use_tools: bool = True,
     ):
         """
         Initialize the RAG agent.
@@ -105,9 +102,7 @@ class DocuMindAgent:
         self._embedding_cache = {}
         self._cache_max_size = 100
 
-        logger.info(
-            f"DocuMindAgent initialized (tools={'enabled' if use_tools else 'disabled'})"
-        )
+        logger.info(f"DocuMindAgent initialized (tools={'enabled' if use_tools else 'disabled'})")
 
     def get_chroma_client(self):
         global _chroma_client
@@ -139,7 +134,7 @@ class DocuMindAgent:
                 persist_directory=self.vector_store_config["persist_directory"],
                 embedding_function=embedding_function,
                 reset_on_start=False,
-                client = self.get_chroma_client()
+                client=self.get_chroma_client(),
             )
 
             logger.info(f"Vector store created with embedding_function: {vector_store.embedding_function is not None}")
@@ -372,36 +367,26 @@ class DocuMindAgent:
         try:
             logger.info(f"Invoking agent with question: {question}")
 
-            result = self.compiled_graph.invoke(
-                initial_state,
-                config={"configurable": {"thread_id": "user_session"}}
-            )
+            result = self.compiled_graph.invoke(initial_state, config={"configurable": {"thread_id": "user_session"}})
 
             if result is None:
                 logger.error("Graph returned None result")
                 return {
                     "answer": "Error: Graph failed to return state",
                     "confidence": 0.0,
-                    "error": "Null result from graph"
+                    "error": "Null result from graph",
                 }
 
             answer = result.get("answer")
 
             if not answer or not answer.strip():
                 logger.warning("No answer generated, using fallback")
-                answer = (
-                    "I couldn't find a relevant answer to your question. "
-                    "The search didn't yield sufficient information."
-                )
+                answer = "I couldn't find a relevant answer to your question. " "The search didn't yield sufficient information."
 
             logger.info(f"[Agent Invoke] Final state keys: {list(result.keys())}")
 
             edge_stats = self.edge_router.get_edge_statistics()
-            tool_stats = (
-                self.tool_router.get_usage_statistics()
-                if self.tool_router
-                else {"tool_usage": {}, "total_tool_calls": 0}
-            )
+            tool_stats = self.tool_router.get_usage_statistics() if self.tool_router else {"tool_usage": {}, "total_tool_calls": 0}
 
             grading_result = result.get("metadata", {}).get("grading_result", {})
 
@@ -488,11 +473,11 @@ class DocuMindAgent:
 
 
 def create_agent(
-        vector_store_config: Dict[str, Any] = None,
-        grader_config: Dict[str, Any] = None,
-        generator_config: Dict[str, Any] = None,
-        max_iterations: int = 3,
-        use_tools: bool = True,
+    vector_store_config: Dict[str, Any] = None,
+    grader_config: Dict[str, Any] = None,
+    generator_config: Dict[str, Any] = None,
+    max_iterations: int = 3,
+    use_tools: bool = True,
 ) -> DocuMindAgent:
     """
     Factory function to create and initialize an agent.

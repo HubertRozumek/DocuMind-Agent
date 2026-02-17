@@ -51,9 +51,7 @@ class GraderNode:
 
         logger.info(f"Initialized GraderNode with type=robust, threshold={confidence_threshold}")
 
-    def grade_document(
-        self, question: str, document: str, metadata: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+    def grade_document(self, question: str, document: str, metadata: Optional[Dict] = None) -> Dict[str, Any]:
         """
         Grade a single document for relevance to the question.
 
@@ -68,9 +66,7 @@ class GraderNode:
         result = self.grader.grade(question, document, metadata)
         return result.to_dict()
 
-    def grade_documents(
-        self, question: str, documents: List[str], metadatas: Optional[List[Dict[str, Any]]] = None
-    ) -> Dict[str, Any]:
+    def grade_documents(self, question: str, documents: List[str], metadatas: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         """
         Grade multiple documents and aggregate results.
 
@@ -101,10 +97,7 @@ class GraderNode:
 
         for i, (doc, result) in enumerate(zip(documents, results)):
             result_dict = result.to_dict()
-            logger.info(
-                f"Doc {i}: LLM_conf={result_dict.get('llm_confidence', 'N/A')}, "
-                f"final_conf={result.confidence}, method={result.method}"
-            )
+            logger.info(f"Doc {i}: LLM_conf={result_dict.get('llm_confidence', 'N/A')}, " f"final_conf={result.confidence}, method={result.method}")
             result_dict["document_index"] = i
 
             doc_preview = doc[:200] + "..." if len(doc) > 200 else doc
@@ -114,13 +107,9 @@ class GraderNode:
 
             if result.is_relevant(self.confidence_threshold):
                 relevant_docs.append(doc)
-                logger.debug(
-                    f"Doc {i}: RELEVANT (confidence={result.confidence:.2f}, score={result.score.name})"
-                )
+                logger.debug(f"Doc {i}: RELEVANT (confidence={result.confidence:.2f}, score={result.score.name})")
             else:
-                logger.debug(
-                    f"Doc {i}: NOT RELEVANT (confidence={result.confidence:.2f}, score={result.score.name})"
-                )
+                logger.debug(f"Doc {i}: NOT RELEVANT (confidence={result.confidence:.2f}, score={result.score.name})")
 
         confidences = [r.confidence for r in results]
         avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
@@ -137,10 +126,7 @@ class GraderNode:
             "is_any_relevant": len(relevant_docs) > 0,
         }
 
-        logger.info(
-            f"[grade_documents] Graded {len(documents)} docs, {len(relevant_docs)} relevant, "
-            f"avg_confidence={avg_confidence:.2f}"
-        )
+        logger.info(f"[grade_documents] Graded {len(documents)} docs, {len(relevant_docs)} relevant, " f"avg_confidence={avg_confidence:.2f}")
 
         for i, (doc, result) in enumerate(zip(documents, results)):
             is_rel = result.is_relevant(self.confidence_threshold)
@@ -207,11 +193,7 @@ class GraderNode:
 
             needs_rewrite = not is_any_relevant and state["iterations"] < state["max_iterations"]
 
-            relevant_confidences = [
-                r["confidence"]
-                for r in grading_result["individual_results"]
-                if r.get("relevant", False)
-            ]
+            relevant_confidences = [r["confidence"] for r in grading_result["individual_results"] if r.get("relevant", False)]
             logger.info(f"[Grader Function] Relevant docs found: {len(relevant_confidences)}")
             if relevant_confidences:
                 confidence = float(max(relevant_confidences))
@@ -247,12 +229,8 @@ class GraderNode:
 
             updated_state = StateManager.add_to_history(updated_state, history_entry)
 
-            logger.info(
-                f"[Grader Function] Found {grading_result['relevant_count']} relevant documents"
-            )
-            logger.info(
-                f"[Grader Function] Confidence: {confidence:.2f}, Needs rewrite: {needs_rewrite}"
-            )
+            logger.info(f"[Grader Function] Found {grading_result['relevant_count']} relevant documents")
+            logger.info(f"[Grader Function] Confidence: {confidence:.2f}, Needs rewrite: {needs_rewrite}")
 
             return updated_state
 

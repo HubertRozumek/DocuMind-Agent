@@ -52,9 +52,7 @@ class BaseGraderModel(ABC):
         pass
 
     @abstractmethod
-    def grade_batch(
-        self, prompts: List[str], system_prompts: Optional[List[str]] = None
-    ) -> List[str]:
+    def grade_batch(self, prompts: List[str], system_prompts: Optional[List[str]] = None) -> List[str]:
         """
         Perform batch grading for multiple documents.
 
@@ -110,9 +108,7 @@ class BaseGraderModel(ABC):
         """
         logger.warning("Using fallback grading (primary model not available)")
 
-        question_keywords = self._extract_keywords(
-            prompt.split("QUESTION:")[1].split("DOCUMENT:")[0]
-        )
+        question_keywords = self._extract_keywords(prompt.split("QUESTION:")[1].split("DOCUMENT:")[0])
         document_text = prompt.split("DOCUMENT:")[1] if "DOCUMENT:" in prompt else ""
         document_keywords = self._extract_keywords(document_text)
 
@@ -280,9 +276,7 @@ class BaseGraderModel(ABC):
         """
         response_lower = response.strip().lower()
 
-        if any(
-            pattern in response_lower for pattern in ["not relevant", "false", "no", "irrelevant"]
-        ):
+        if any(pattern in response_lower for pattern in ["not relevant", "false", "no", "irrelevant"]):
             return False
 
         if any(pattern in response_lower for pattern in ["yes", "true", "relevant"]):
@@ -456,9 +450,7 @@ class OllamaGrader(BaseGraderModel):
 
         return self._fallback_grade(prompt)
 
-    def grade_batch(
-        self, prompts: List[str], system_prompts: Optional[List[str]] = None
-    ) -> List[str]:
+    def grade_batch(self, prompts: List[str], system_prompts: Optional[List[str]] = None) -> List[str]:
         """
         Grade multiple documents sequentially.
 
@@ -472,9 +464,7 @@ class OllamaGrader(BaseGraderModel):
         results = []
 
         for i, prompt in enumerate(prompts):
-            system_prompt = (
-                system_prompts[i] if system_prompts and i < len(system_prompts) else None
-            )
+            system_prompt = system_prompts[i] if system_prompts and i < len(system_prompts) else None
             result = self.grade(prompt, system_prompt=system_prompt)
             results.append(result)
 

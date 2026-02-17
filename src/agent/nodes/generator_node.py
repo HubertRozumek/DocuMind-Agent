@@ -29,9 +29,7 @@ class GeneratorNode:
         chain: Compiled LangChain pipeline
     """
 
-    def __init__(
-        self, model_name: str = "mistral:7b", temperature: float = 0.1, max_tokens: int = 500
-    ):
+    def __init__(self, model_name: str = "mistral:7b", temperature: float = 0.1, max_tokens: int = 500):
         """
         Initialize the answer generator with LLM configuration.
 
@@ -132,13 +130,9 @@ class GeneratorNode:
             }
 
         try:
-            combined_docs = "\n\n".join(
-                [f"Document {i + 1}:\n{doc[:2000]}" for i, doc in enumerate(documents[:3])]
-            )
+            combined_docs = "\n\n".join([f"Document {i + 1}:\n{doc[:2000]}" for i, doc in enumerate(documents[:3])])
 
-            logger.info(
-                f"[generate_answer] Calling LLM (attempt {retry_count + 1}/{max_retries + 1})"
-            )
+            logger.info(f"[generate_answer] Calling LLM (attempt {retry_count + 1}/{max_retries + 1})")
             logger.debug(f"[generate_answer] Question: {question}")
 
             answer = None
@@ -157,27 +151,19 @@ class GeneratorNode:
                     timed_out = True
 
             logger.info(f"[generate_answer] Raw LLM response type: {type(answer)}")
-            logger.debug(
-                f"[generate_answer] Raw LLM response: {repr(answer)[:500] if answer else 'None (timeout)'}"
-            )
+            logger.debug(f"[generate_answer] Raw LLM response: {repr(answer)[:500] if answer else 'None (timeout)'}")
 
             if timed_out:
                 if retry_count < max_retries:
-                    logger.warning(
-                        f"[generate_answer] Timeout, retrying ({retry_count + 1}/{max_retries})..."
-                    )
+                    logger.warning(f"[generate_answer] Timeout, retrying ({retry_count + 1}/{max_retries})...")
                     import time
 
                     time.sleep(1.0 * (retry_count + 1))
-                    return self.generate_answer(
-                        question, documents, metadata, retry_count + 1, max_retries, timeout
-                    )
+                    return self.generate_answer(question, documents, metadata, retry_count + 1, max_retries, timeout)
                 else:
                     logger.error("[generate_answer] Max retries after timeout exceeded")
                     return {
-                        "answer": self._generate_fallback_answer(
-                            question, documents, error="Generation timeout"
-                        ),
+                        "answer": self._generate_fallback_answer(question, documents, error="Generation timeout"),
                         "confidence": 0.0,
                         "sources_used": 0,
                         "documents_considered": len(documents),
@@ -190,15 +176,11 @@ class GeneratorNode:
 
             if not answer_text:
                 if retry_count < max_retries:
-                    logger.warning(
-                        f"[generate_answer] Empty response, retrying ({retry_count + 1}/{max_retries})..."
-                    )
+                    logger.warning(f"[generate_answer] Empty response, retrying ({retry_count + 1}/{max_retries})...")
                     import time
 
                     time.sleep(0.5 * (retry_count + 1))
-                    return self.generate_answer(
-                        question, documents, metadata, retry_count + 1, max_retries, timeout
-                    )
+                    return self.generate_answer(question, documents, metadata, retry_count + 1, max_retries, timeout)
                 else:
                     logger.error("[generate_answer] LLM returned empty response after all retries")
                     answer_text = self._generate_fallback_answer(question, documents)
@@ -210,9 +192,7 @@ class GeneratorNode:
 
             confidence = min(0.95, base + doc_count_bonus + quality_bonus)
 
-            logger.info(
-                f"[generate_answer] Successfully generated answer (confidence: {confidence:.2f})"
-            )
+            logger.info(f"[generate_answer] Successfully generated answer (confidence: {confidence:.2f})")
 
             return {
                 "answer": answer_text,
@@ -231,9 +211,7 @@ class GeneratorNode:
                 import time
 
                 time.sleep(1.0 * (retry_count + 1))
-                return self.generate_answer(
-                    question, documents, metadata, retry_count + 1, max_retries, timeout
-                )
+                return self.generate_answer(question, documents, metadata, retry_count + 1, max_retries, timeout)
 
             logger.error("[generate_answer] Max retries after exception exceeded")
             return {
@@ -246,9 +224,7 @@ class GeneratorNode:
                 "retries_needed": retry_count,
             }
 
-    def _generate_fallback_answer(
-        self, question: str, documents: List[str], error: Optional[str] = None
-    ) -> str:
+    def _generate_fallback_answer(self, question: str, documents: List[str], error: Optional[str] = None) -> str:
         """
         Generate a user-friendly fallback response when LLM generation fails.
 
@@ -274,20 +250,12 @@ class GeneratorNode:
 
         doc_previews = [doc[:200] + "..." for doc in documents[:2]]
 
-        fallback = (
-            "I encountered an issue generating a complete answer. "
-            "However, I found these relevant documents:\n\n"
-        )
+        fallback = "I encountered an issue generating a complete answer. " "However, I found these relevant documents:\n\n"
 
         for i, preview in enumerate(doc_previews, 1):
             fallback += f"{i}. {preview}\n\n"
 
-        fallback += (
-            "Please try:\n"
-            "• Asking a more specific question\n"
-            "• Rephrasing your query\n"
-            "• Checking the system logs for details"
-        )
+        fallback += "Please try:\n" "• Asking a more specific question\n" "• Rephrasing your query\n" "• Checking the system logs for details"
 
         if error:
             fallback += f"\n\nTechnical details: {error}"

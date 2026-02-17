@@ -1,7 +1,8 @@
-from typing import Literal, Dict, Any, Callable
-from langgraph.graph import END
 import logging
 from datetime import datetime
+from typing import Any, Callable, Dict, Literal
+
+from langgraph.graph import END
 
 from src.agent.graph_state import GraphState
 
@@ -35,8 +36,7 @@ def should_continue_to_rewriter(state: GraphState) -> Literal["rewrite", "genera
     confidence = state.get("confidence", 0.0)
 
     logger.info(f"[Routing Decision] Iteration {iterations}/{max_iterations}")
-    logger.info(
-        f"[Routing Decision] Docs: {len(documents)}, Relevant: {len(relevant_docs)}, Confidence: {confidence:.2f}")
+    logger.info(f"[Routing Decision] Docs: {len(documents)}, Relevant: {len(relevant_docs)}, Confidence: {confidence:.2f}")
 
     if iterations >= max_iterations:
         if documents or relevant_docs:
@@ -172,17 +172,19 @@ class EdgeRouter:
         """
         decision = should_continue_to_rewriter(state)
 
-        self.edge_history.append({
-            "timestamp": datetime.now().isoformat(),
-            "from_node": "grader",
-            "to_node": decision,
-            "state_snapshot": {
-                "iterations": state.get("iterations", 0),
-                "relevant_docs_count": len(state.get("relevant_docs", [])),
-                "confidence": state.get("confidence", 0.0),
-                "needs_rewrite": state.get("needs_rewrite", False)
+        self.edge_history.append(
+            {
+                "timestamp": datetime.now().isoformat(),
+                "from_node": "grader",
+                "to_node": decision,
+                "state_snapshot": {
+                    "iterations": state.get("iterations", 0),
+                    "relevant_docs_count": len(state.get("relevant_docs", [])),
+                    "confidence": state.get("confidence", 0.0),
+                    "needs_rewrite": state.get("needs_rewrite", False),
+                },
             }
-        })
+        )
 
         return decision
 
@@ -198,16 +200,18 @@ class EdgeRouter:
         """
         decision = should_rewrite_again(state)
 
-        self.edge_history.append({
-            "timestamp": datetime.now().isoformat(),
-            "from_node": "rewriter",
-            "to_node": decision,
-            "state_snapshot": {
-                "iterations": state.get("iterations", 0),
-                "rewrite_index": state.get("current_rewrite_index", 0),
-                "total_rewrites": len(state.get("rewritten_questions", []))
+        self.edge_history.append(
+            {
+                "timestamp": datetime.now().isoformat(),
+                "from_node": "rewriter",
+                "to_node": decision,
+                "state_snapshot": {
+                    "iterations": state.get("iterations", 0),
+                    "rewrite_index": state.get("current_rewrite_index", 0),
+                    "total_rewrites": len(state.get("rewritten_questions", [])),
+                },
             }
-        })
+        )
 
         return decision
 
@@ -223,15 +227,17 @@ class EdgeRouter:
         """
         decision = route_after_generation(state)
 
-        self.edge_history.append({
-            "timestamp": datetime.now().isoformat(),
-            "from_node": "generator",
-            "to_node": "END" if decision == END else "rewrite",
-            "state_snapshot": {
-                "answer_present": state.get("answer") is not None,
-                "iterations": state.get("iterations", 0)
+        self.edge_history.append(
+            {
+                "timestamp": datetime.now().isoformat(),
+                "from_node": "generator",
+                "to_node": "END" if decision == END else "rewrite",
+                "state_snapshot": {
+                    "answer_present": state.get("answer") is not None,
+                    "iterations": state.get("iterations", 0),
+                },
             }
-        })
+        )
 
         return decision
 
@@ -253,7 +259,7 @@ class EdgeRouter:
                 "rewrite": decisions.count("rewrite"),
                 "generate": decisions.count("generate"),
                 "retrieve": decisions.count("retrieve"),
-                "end": decisions.count("end") + decisions.count(END)
+                "end": decisions.count("end") + decisions.count(END),
             },
-            "recent_decisions": self.edge_history[-5:] if len(self.edge_history) > 5 else self.edge_history
+            "recent_decisions": self.edge_history[-5:] if len(self.edge_history) > 5 else self.edge_history,
         }

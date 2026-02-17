@@ -51,12 +51,7 @@ def create_ticket_tools() -> List[Tool]:
     Returns:
         List of ticket-related tools
     """
-    from src.tools.ticket_checker import (
-        check_ticket_status,
-        get_open_tickets_summary,
-        get_ticket_api,
-        search_my_tickets,
-    )
+    from src.tools.ticket_checker import check_ticket_status, get_open_tickets_summary, get_ticket_api, search_my_tickets
 
     tools = [
         StructuredTool(
@@ -82,8 +77,7 @@ def create_ticket_tools() -> List[Tool]:
         Tool(
             name="get_open_tickets",
             description=(
-                "Get a summary of all currently open tickets in the system. "
-                "Use this when the user asks about open tickets or ticket queue."
+                "Get a summary of all currently open tickets in the system. " "Use this when the user asks about open tickets or ticket queue."
             ),
             func=get_open_tickets_summary,
         ),
@@ -128,9 +122,7 @@ def create_document_tools(vector_store=None) -> List[Tool]:
 
             output = f"Found {len(results['documents'])} relevant document(s):\n\n"
 
-            for i, (doc, similarity) in enumerate(
-                zip(results["documents"], results.get("similarities", []))
-            ):
+            for i, (doc, similarity) in enumerate(zip(results["documents"], results.get("similarities", []))):
                 preview = doc[:200] + "..." if len(doc) > 200 else doc
                 output += f"{i+1}. (Similarity: {similarity:.2f})\n{preview}\n\n"
 
@@ -166,10 +158,7 @@ def create_document_tools(vector_store=None) -> List[Tool]:
         ),
         Tool(
             name="get_document_count",
-            description=(
-                "Get the total number of documents in the knowledge base. "
-                "Use this when asked about how many documents are available."
-            ),
+            description=("Get the total number of documents in the knowledge base. " "Use this when asked about how many documents are available."),
             func=get_document_count,
         ),
     ]
@@ -243,10 +232,7 @@ class ToolRouter:
                 return ("get_ticket_statistics", {})
 
         # Document count query
-        if any(
-            phrase in query_lower
-            for phrase in ["how many documents", "number of documents", "document count"]
-        ):
+        if any(phrase in query_lower for phrase in ["how many documents", "number of documents", "document count"]):
             return ("get_document_count", {})
 
         # Default to document search
@@ -382,11 +368,7 @@ class ToolErrorHandler:
             "error_type": type(error).__name__,
             "error_message": str(error),
             "query": query,
-            "timestamp": logging.Formatter().formatTime(
-                logging.LogRecord(
-                    name="", level=0, pathname="", lineno=0, msg="", args=(), exc_info=None
-                )
-            ),
+            "timestamp": logging.Formatter().formatTime(logging.LogRecord(name="", level=0, pathname="", lineno=0, msg="", args=(), exc_info=None)),
         }
 
         self.error_log.append(error_entry)
@@ -403,9 +385,7 @@ class ToolErrorHandler:
 
         if fallback_to_search:
             logger.info("Falling back to document search")
-            response["fallback_message"] = (
-                f"The {tool_name} tool encountered an error. " "Searching documents instead..."
-            )
+            response["fallback_message"] = f"The {tool_name} tool encountered an error. " "Searching documents instead..."
 
         return response
 

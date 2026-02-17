@@ -56,14 +56,10 @@ class QueryRewriter:
         search_history = state.get("search_history", [])
         history_text = "\n".join(search_history[-3:]) if search_history else "No history"
 
-        rewritten_questions_text = self.chain.invoke(
-            {"question": state["question"], "search_history": history_text}
-        )
+        rewritten_questions_text = self.chain.invoke({"question": state["question"], "search_history": history_text})
 
         rewritten_questions = [
-            q.strip()
-            for q in rewritten_questions_text.split("\n")
-            if q.strip() and q.strip().lower() != state["question"].lower()
+            q.strip() for q in rewritten_questions_text.split("\n") if q.strip() and q.strip().lower() != state["question"].lower()
         ]
 
         # Fallback if LLM returns empty or invalid
@@ -104,9 +100,7 @@ class QueryRewriter:
         updated_state["decision_log"] = decision_log
 
         logger.info(f"Rewrite complete. State keys: {list(updated_state.keys())}")
-        logger.info(
-            f"rewritten_questions in state: {len(updated_state.get('rewritten_questions', []))}"
-        )
+        logger.info(f"rewritten_questions in state: {len(updated_state.get('rewritten_questions', []))}")
 
         return updated_state
 

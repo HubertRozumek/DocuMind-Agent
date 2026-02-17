@@ -56,9 +56,7 @@ def get_semantic_model():
 
             logger.info(f"Using device: {device}")
 
-            _semantic_model_instance = SentenceTransformer(
-                "sentence-transformers/all-mpnet-base-v2", device=device
-            )
+            _semantic_model_instance = SentenceTransformer("sentence-transformers/all-mpnet-base-v2", device=device)
 
             logger.info("Semantic model loaded successfully")
 
@@ -190,9 +188,14 @@ class GraderConfig:
 
     def __post_init__(self):
         """Validate configuration parameters."""
-        assert 0 <= self.relevance_threshold <= 1
-        assert self.semantic_highly_relevant > self.semantic_relevant
-        assert self.semantic_relevant > self.semantic_somewhat_relevant
+        if not (0 <= self.relevance_threshold <= 1):
+            raise ValueError("relevance_threshold must be between 0 and 1")
+
+        if not self.semantic_highly_relevant > self.semantic_relevant:
+            raise ValueError("semantic_highly_relevant must be greater than semantic_relevant")
+
+        if not self.semantic_relevant > self.semantic_somewhat_relevant:
+            raise ValueError("semantic_relevant must be greater than semantic_somewhat_relevant")
 
 
 class RobustGrader:
@@ -243,15 +246,11 @@ class RobustGrader:
 
             if self.config.skip_fallback_on_clear_verdict:
                 if llm_result.confidence >= 0.85 or llm_result.confidence <= 0.15:
-                    logger.info(
-                        f"LLM confidence clear ({llm_result.confidence:.2f}), skipping fallback"
-                    )
+                    logger.info(f"LLM confidence clear ({llm_result.confidence:.2f}), skipping fallback")
                     return llm_result
 
             if llm_result.confidence >= self.config.llm_min_confidence:
-                logger.info(
-                    f"LLM confidence sufficient ({llm_result.confidence:.2f}), using LLM result"
-                )
+                logger.info(f"LLM confidence sufficient ({llm_result.confidence:.2f}), using LLM result")
                 return llm_result
 
             if metadata and metadata.get("source_type") == "policy":
@@ -271,9 +270,7 @@ class RobustGrader:
         try:
             semantic_result = self._semantic_similarity(question, document)
             if semantic_result.confidence >= self.config.fallback_min_threshold:
-                logger.info(
-                    f"Using semantic fallback with confidence {semantic_result.confidence:.2f}"
-                )
+                logger.info(f"Using semantic fallback with confidence {semantic_result.confidence:.2f}")
                 return semantic_result
         except Exception as e:
             logger.warning(f"Semantic fallback failed: {e}")
@@ -400,9 +397,7 @@ class RobustGrader:
             }
             score = score_map.get(rating, RelevanceScore.SOMEWHAT_RELEVANT)
 
-            logger.info(
-                f"[LLM Result] rating={rating}, confidence={confidence}, score={score.name}"
-            )
+            logger.info(f"[LLM Result] rating={rating}, confidence={confidence}, score={score.name}")
 
             return GradingResult(
                 score=score,
@@ -497,9 +492,7 @@ class RobustGrader:
 
             q_embedding = self._question_cache[question]
             d_embedding = model.encode([document])[0]
-            similarity = np.dot(q_embedding, d_embedding) / (
-                np.linalg.norm(q_embedding) * np.linalg.norm(d_embedding)
-            )
+            similarity = np.dot(q_embedding, d_embedding) / (np.linalg.norm(q_embedding) * np.linalg.norm(d_embedding))
 
             if similarity > self.config.semantic_highly_relevant:
                 score = RelevanceScore.HIGHLY_RELEVANT

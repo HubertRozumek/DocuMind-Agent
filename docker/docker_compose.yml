@@ -1,7 +1,7 @@
 # ============================================
 # DocuMind-Agent Docker Compose Configuration
 # ============================================
-
+---
 services:
   # ============================================
   # Ollama - Local LLM Server
@@ -30,7 +30,6 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    # Note: Remove the deploy section if you don't have GPU
 
   # ============================================
   # Ollama Model Downloader (Init Container)

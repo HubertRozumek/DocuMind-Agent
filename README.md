@@ -1,4 +1,4 @@
-#  DocuMind-Agent - Intelligent Document Q&A System
+# DocuMind-Agent - Intelligent Document Q&A System
 
 <div align="center">
 
@@ -10,10 +10,9 @@
 
 **A production-ready Retrieval-Augmented Generation (RAG) system with self-correction, multi-tier document grading, and intelligent query rewriting.**
 
-[Features](#-features) • [Architecture](#-architecture) • [Installation](#-installation) • [Usage](#-usage) 
+[Features](#-features) • [Architecture](#-architecture) • [Installation](#-installation) • [Usage](#-usage)
 
-
-<img src="images/example-output.png" width="700">
+<img src="images/example-output.png" width="100%">
 <br>
 <em>Example output of the system</em>
 
@@ -21,27 +20,27 @@
 
 ---
 
-##  Overview
+## Overview
 
 DocuMind-Agent is an advanced RAG-based question-answering system that enables intelligent conversations with your documents. Unlike basic RAG implementations, DocuMind incorporates **self-correction mechanisms**, **multi-tier relevance grading**, and **intelligent query rewriting** to deliver accurate, contextually-aware answers.
 
 ### Why DocuMind-Agent?
 
--  **High Accuracy**: 3-tier document grading (LLM → Semantic → Keyword) ensures relevant answers
--  **Self-Correcting**: Automatically rewrites queries when initial results are insufficient
--  **Modular Architecture**: Clean separation using LangGraph for easy extension and maintenance
--  **Production-Ready**: Comprehensive error handling, logging, and configuration management
--  **Modern Stack**: Built with cutting-edge tools (LangChain, ChromaDB, Streamlit)
+- **High Accuracy**: 3-tier document grading (LLM → Semantic → Keyword) ensures relevant answers
+- **Self-Correcting**: Automatically rewrites queries when initial results are insufficient
+- **Modular Architecture**: Clean separation using LangGraph for easy extension and maintenance
+- **Production-Ready**: Comprehensive error handling, logging, and configuration management
+- **Modern Stack**: Built with cutting-edge tools (LangChain, ChromaDB, Streamlit)
 
 ### Perfect For
 
--  Research teams needing intelligent document search
--  Businesses automating knowledge management
--  Data scientists exploring RAG architectures
+- Research teams needing intelligent document search
+- Businesses automating knowledge management
+- Data scientists exploring RAG architectures
 
 ---
 
-##  Features
+## Features
 
 ### Core Capabilities
 
@@ -90,7 +89,7 @@ DocuMind-Agent is an advanced RAG-based question-answering system that enables i
 
 ---
 
-##  Architecture
+## Architecture
 
 ### System Design
 
@@ -141,27 +140,32 @@ DocuMind implements a sophisticated RAG pipeline with multiple stages:
 ### Component Breakdown
 
 #### 1. **Document Processing Layer**
+
 - **PDFLoader**: Multi-strategy PDF parsing with automatic fallback
 - **TextSplitter**: Recursive character splitting with overlap
 - **EmbeddingManager**: Sentence transformer model management
 
 #### 2. **Vector Store Layer**
+
 - **ChromaDBVectorStore**: Persistent vector database with batch operations
 - Cosine similarity search with configurable thresholds
 - Metadata filtering and document management
 
 #### 3. **RAG Agent Layer**
+
 - **RetrieverNode**: Query preprocessing and document retrieval
 - **GraderNode**: Multi-tier relevance assessment
 - **RewriterNode**: Intelligent query transformation
 - **GeneratorNode**: Context-aware answer generation
 
 #### 4. **Orchestration Layer**
+
 - **LangGraph StateGraph**: Workflow management with state tracking
 - **EdgeRouter**: Decision logic for graph transitions
 - **StateManager**: Centralized state operations
 
 #### 5. **UI Layer**
+
 - **Streamlit Interface**: Interactive chat with document upload
 - Real-time processing indicators
 - Confidence and metadata display
@@ -181,7 +185,7 @@ DocuMind implements a sophisticated RAG pipeline with multiple stages:
 
 ---
 
-##  Installation
+## Installation
 
 ### Prerequisites
 
@@ -303,7 +307,7 @@ python -m pytest tests/test_integration.py::test_pdf_to_vector_store_pipeline -v
 
 ---
 
-##  Usage
+## Usage
 
 ### Starting the Application
 
@@ -326,12 +330,14 @@ The application will open in your browser at `http://localhost:8501`
 - Press **"Create"**
 
 #### 2. **Upload Documents**
+
 - Click **"Browse files"** in the sidebar
 - Select one or more PDF files (max 50MB each)
 - Click **"Process Documents"**
 - Wait for processing to complete
 
 #### 3. **Ask Questions**
+
 - Type your question in the chat input
 - Press Enter or click Send
 - The agent will:
@@ -340,6 +346,7 @@ The application will open in your browser at `http://localhost:8501`
   - Generate an answer with sources
 
 #### 4. **Adjust Settings**
+
 - Choose agent mode:
   - **Fast**: Single iteration, quick responses
   - **Balanced**: 2 iterations, optimal quality
@@ -479,7 +486,7 @@ print(f"Reason: {result.reason}")
 
 ---
 
-##  Testing
+## Testing
 
 ### Running Tests
 
@@ -513,7 +520,7 @@ tests/
 
 ---
 
-##  Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -565,7 +572,7 @@ AGENT_PRESETS = {
 
 ---
 
-##  Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -586,6 +593,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 **Problem**: Cannot connect to Ollama server
 
 **Solution**:
+
 ```bash
 # Check if Ollama is running
 curl http://localhost:11434/api/tags
@@ -602,6 +610,7 @@ ollama list
 **Problem**: `sqlite3.OperationalError: database is locked`
 
 **Solution**:
+
 ```bash
 # Close all connections to the database
 pkill -9 python  # Caution: kills all Python processes
@@ -615,6 +624,7 @@ export CHROMA_PERSIST_DIR=data/vector_store/chroma_new
 **Problem**: System runs out of RAM during embedding
 
 **Solution**:
+
 ```python
 # Reduce batch size in config.py
 batch_size: int = 50  # Default is 100
@@ -629,6 +639,7 @@ export EMBEDDING_DEVICE=cpu
 **Problem**: PDF processing takes too long
 
 **Solution**:
+
 ```bash
 # Use faster PDF loader
 export PDF_LOADER_TYPE=pymupdf  # Fastest option
@@ -675,7 +686,6 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 
 ---
 
-
 ## References & Resources
 
 ### Learning Resources
@@ -702,12 +712,12 @@ If you use DocuMind-Agent in research or publications:
 
 ---
 
-##  Contact & Support
+## Contact & Support
 
 ### Get In Touch
 
--  **Email**: hubert.rozumek9@gmail.com
--  **GitHub**: [@Hubert](hhttps://github.com/HubertRozumek)
+- **Email**: <hubert.rozumek9@gmail.com>
+- **GitHub**: [Hubert](hhttps://github.com/HubertRozumek)
 
 ---
 

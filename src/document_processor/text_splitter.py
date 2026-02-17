@@ -5,11 +5,7 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 try:
-    from langchain_text_splitters import (
-        CharacterTextSplitter,
-        RecursiveCharacterTextSplitter,
-        TokenTextSplitter,
-    )
+    from langchain_text_splitters import CharacterTextSplitter, RecursiveCharacterTextSplitter, TokenTextSplitter
 
     LANGCHAIN_AVAILABLE = True
 except ImportError:
@@ -91,14 +87,9 @@ class TextSplitter:
         self.strategy = strategy
         self.min_chunk_size = min_chunk_size
 
-        self.splitter = self._create_splitter(
-            strategy, chunk_size, chunk_overlap, length_function, separators
-        )
+        self.splitter = self._create_splitter(strategy, chunk_size, chunk_overlap, length_function, separators)
 
-        logger.info(
-            f"TextSplitter initialized: strategy={strategy}, "
-            f"size={chunk_size}, overlap={chunk_overlap}"
-        )
+        logger.info(f"TextSplitter initialized: strategy={strategy}, " f"size={chunk_size}, overlap={chunk_overlap}")
 
     def _create_splitter(
         self,
@@ -147,24 +138,16 @@ class TextSplitter:
             # Splits based on meaning, not just characters
 
             if not SEMANTIC_AVAILABLE:
-                raise ImportError(
-                    "Semantic chunking requires: "
-                    "pip install langchain-experimental langchain-openai"
-                )
+                raise ImportError("Semantic chunking requires: " "pip install langchain-experimental langchain-openai")
 
-            logger.warning(
-                "Semantic chunking requires OpenAI API key. "
-                "Set OPENAI_API_KEY environment variable."
-            )
+            logger.warning("Semantic chunking requires OpenAI API key. " "Set OPENAI_API_KEY environment variable.")
 
             return SemanticChunker(OpenAIEmbeddings(), breakpoint_threshold_type="percentile")
 
         elif strategy == "character":
             # Simple character-based splitting
 
-            return CharacterTextSplitter(
-                chunk_size=chunk_size, chunk_overlap=chunk_overlap, separator="\n\n"
-            )
+            return CharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap, separator="\n\n")
 
         else:
             raise ValueError(f"Unknown strategy: {strategy}")
