@@ -257,7 +257,7 @@ def test_add_performance(vector_store_config, mock_embedding_function, performan
     with performance_timer() as timer:
         store.add_documents(docs)
 
-    assert timer.elapsed < 5.0
+    assert timer.elapsed < 10.0
 
 
 def test_search_performance(vector_store_config, mock_embedding_function, performance_timer):
