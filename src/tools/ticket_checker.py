@@ -1,8 +1,10 @@
+import html
 import logging
-from typing import Dict, Any, Optional, List
-from datetime import datetime, timedelta
 import random
+import threading
+from datetime import datetime, timedelta
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -11,6 +13,7 @@ class TicketStatus(Enum):
     """
     Possible ticket statuses
     """
+
     OPEN = "open"
     IN_PROGRESS = "in_progress"
     PENDING = "pending"
@@ -22,6 +25,7 @@ class TicketPriority(Enum):
     """
     Ticket priority levels
     """
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -41,7 +45,12 @@ class MockTicketAPI:
         Args:
             seed: Random seed for reproducible results
         """
-        random.seed(seed)
+        if seed is not None:
+            random.seed(seed)
+            logger.warning("Mock API initialized with deterministic seed - not for production!")
+        else:
+            random.seed()
+
         self.tickets_db = self._generate_sample_tickets()
         logger.info(f"MockTicketAPI initialized with {len(self.tickets_db)} tickets")
 
@@ -121,7 +130,7 @@ class MockTicketAPI:
 
         return tickets
 
-    def get_ticket(self, ticket_id: str) -> Optional[Dict[str, Any]]:
+    def get_ticket(self, ticket_id: str) -> Optional[dict[str, dict[str, Any]]]:
         """
         Retrieve ticket by ID.
 
@@ -169,11 +178,11 @@ class MockTicketAPI:
         }
 
     def search_tickets(
-            self,
-            status: Optional[str] = None,
-            priority: Optional[str] = None,
-            assigned_to: Optional[str] = None,
-            category: Optional[str] = None,
+        self,
+        status: Optional[str] = None,
+        priority: Optional[str] = None,
+        assigned_to: Optional[str] = None,
+        category: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Search tickets by criteria.
@@ -233,9 +242,9 @@ class MockTicketAPI:
             Statistics dictionary
         """
         total = len(self.tickets_db)
-        by_status = {}
-        by_priority = {}
-        by_category = {}
+        by_status: Dict = {}
+        by_priority: Dict = {}
+        by_category: Dict = {}
 
         for ticket in self.tickets_db.values():
             # Count by status
@@ -259,11 +268,11 @@ class MockTicketAPI:
         }
 
     def create_ticket(
-            self,
-            title: str,
-            description: str,
-            priority: str = "medium",
-            category: str = "General",
+        self,
+        title: str,
+        description: str,
+        priority: str = "medium",
+        category: str = "General",
     ) -> Dict[str, Any]:
         """
         Create a new ticket (simulated).
@@ -277,16 +286,18 @@ class MockTicketAPI:
         Returns:
             Created ticket data
         """
-        # Validation
-        if not title or not title.strip():
+        title = html.escape(title.strip())
+        description = html.escape(description.strip())
+        category = html.escape(category.strip())
+
+        if not title:
             raise ValueError("Title cannot be empty")
-
-        if not description or not description.strip():
+        if len(title) > 200:
+            raise ValueError("Title too long (max 200 characters)")
+        if not description:
             raise ValueError("Description cannot be empty")
-
-        valid_priorities = ["low", "medium", "high", "critical"]
-        if priority.lower() not in valid_priorities:
-            raise ValueError(f"Priority must be one of: {valid_priorities}")
+        if len(description) > 5000:
+            raise ValueError("Description too long (max 5000 characters)")
 
         # Generate new ticket ID
         ticket_count = len(self.tickets_db) + 1
@@ -314,6 +325,7 @@ class MockTicketAPI:
 
 # Global instance for easy access
 _global_api = None
+_api_lock = threading.Lock()
 
 
 def get_ticket_api() -> MockTicketAPI:
@@ -322,7 +334,9 @@ def get_ticket_api() -> MockTicketAPI:
     """
     global _global_api
     if _global_api is None:
-        _global_api = MockTicketAPI()
+        with _api_lock:
+            if _global_api is None:
+                _global_api = MockTicketAPI()
     return _global_api
 
 

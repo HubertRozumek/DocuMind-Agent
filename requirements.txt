@@ -1,13 +1,66 @@
-langchain
-langchain-community
-langgraph
+# ============================================
+# DocuMind-Agent Requirements
+# ============================================
+
+# Core Framework
+streamlit>=1.28.0
+python-dotenv>=1.0.0
+
+# LLM & Agent Framework
+langchain==1.2.7
+langchain-core==1.2.7
+langchain-community==0.4.1
+langsmith==0.6.7
+langchain-ollama
+tiktoken==0.12.0
+
+
+# Vector Store
 chromadb==0.4.22
-streamlit==1.28.0
-pypdf2==3.0.1
-sentence-transformers==2.2.2
-faiss-cpu==1.7.4
-ollama==0.1.6
-python-dotenv==1.0.0
-fpdf2==2.7.6
-pdfplumber==0.10.3
-PyPDF2==3.0.1
+
+# Embeddings
+sentence-transformers>=2.2.2,<3.0.0
+torch>=2.0.0,<3.0.0
+transformers>=4.35.0,<5.0.0
+
+# PDF Processing
+pymupdf>=1.23.0,<2.0.0
+pypdf>=3.17.0,<4.0.0
+reportlab>=4.0.0,<5.0.0
+
+# Data Processing
+numpy>=1.24.0,<2.0.0
+pandas>=2.0.0,<3.0.0
+
+# Utilities
+pydantic>=2.0.0,<3.0.0
+python-dateutil>=2.8.0
+regex>=2023.0.0
+
+# HTTP & API
+requests>=2.31.0
+httpx>=0.25.0
+
+# Testing (development)
+pytest>=7.4.0,<8.0.0
+pytest-cov>=4.1.0,<5.0.0
+pytest-asyncio>=0.21.0,<1.0.0
+pytest-mock>=3.12.0,<4.0.0
+
+# Code Quality (development)
+black>=23.0.0,<24.0.0
+flake8>=6.1.0,<7.0.0
+isort>=5.12.0,<6.0.0
+mypy>=1.7.0,<2.0.0
+pre-commit>=3.5.0,<4.0.0
+pylint>=3.0.0,<4.0.0
+
+# Type Stubs (development)
+types-requests>=2.31.0
+types-python-dateutil>=2.8.0
+
+# Documentation (development)
+mkdocs>=1.5.0,<2.0.0
+mkdocs-material>=9.4.0,<10.0.0
+mkdocstrings>=0.24.0,<1.0.0
+mkdocstrings-python>=1.7.0,<2.0.0

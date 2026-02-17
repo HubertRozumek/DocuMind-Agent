@@ -1,31 +1,44 @@
-import torch
-from sentence_transformers import SentenceTransformer
-from chromadb.api.types import Documents, Embeddings, EmbeddingFunction
-from typing import List, Dict, Any, Optional, Union
-import numpy as np
-import time
 import logging
-from enum import Enum
 import os
+import time
+import warnings
+from enum import Enum
+from typing import List, Optional, Union
+
+import numpy as np
+import torch
+from chromadb.api.types import Documents, EmbeddingFunction, Embeddings
+from sentence_transformers import SentenceTransformer
+
+warnings.filterwarnings("ignore", message=".*torch.classes.*")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 class EmbeddingModelType(Enum):
     """
     Embedding model types
     """
+
     MULTILINGUAL_MINILM = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     ADA_002 = "text-embedding-ada-002"
     E5_SMALL = "intfloat/multilingual-e5-small"
     E5_LARGE = "intfloat/multilingual-e5-large"
+    MPNET = "sentence-transformers/all-mpnet-base-v2"
+
 
 class EmbeddingManager:
     """
     Manager class for embedding models
     """
 
-    def __init__(self,model_type: Union[EmbeddingModelType, str] = EmbeddingModelType.MULTILINGUAL_MINILM, device: Optional[str] = None, cache_dir: str ="models/cache"):
+    def __init__(
+        self,
+        model_type: Union[EmbeddingModelType, str] = EmbeddingModelType.MPNET,
+        device: Optional[str] = None,
+        cache_dir: str = "models/cache",
+    ):
         """
         Args:
             model_type: model type
@@ -49,14 +62,14 @@ class EmbeddingManager:
 
         if torch.cuda.is_available():
             return "cuda"
-        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
             return "mps"
         else:
             return "cpu"
 
     def load_model(self):
         """
-        Embeddings model loading
+        Embeddings model loading.
         """
 
         if self.model is not None:
@@ -70,9 +83,9 @@ class EmbeddingManager:
             start_time = time.time()
 
             if self.model_type == EmbeddingModelType.ADA_002:
-                logger.warning(f"OpenAI ADA-002 requires API key")
-                self.model_type = EmbeddingModelType.MULTILINGUAL_MINILM
-                self.model_name = self.model_type.name
+                logger.warning("OpenAI ADA-002 requires API key")
+                self.model_type = EmbeddingModelType.MPNET
+                self.model_name = self.model_type.value
 
             self.model = SentenceTransformer(
                 model_name_or_path=self.model_name,
@@ -80,7 +93,7 @@ class EmbeddingManager:
                 cache_folder=self.cache_dir,
             )
 
-            test_embedding = self.model.encode(['test'])
+            test_embedding = self.model.encode(["test"])
             embedding_dim = len(test_embedding[0])
 
             load_time = time.time() - start_time
@@ -95,7 +108,13 @@ class EmbeddingManager:
             logger.error(f"Failed to load model: {e}")
             raise
 
-    def encode(self, texts: List[str], batch_size: int = 32, show_progress_bar: bool = True, normalize_embeddings: bool = True) -> np.ndarray:
+    def encode(
+        self,
+        texts: List[str],
+        batch_size: int = 32,
+        show_progress_bar: bool = True,
+        normalize_embeddings: bool = True,
+    ) -> np.ndarray:
         """
         Creates embeddings for a list of texts
 
@@ -148,7 +167,7 @@ class EmbeddingManager:
 
     def get_embedding_dimension(self) -> int:
         """
-        returns the embedding dimension
+        Returns the embedding dimension.
         """
         if self.model is None:
             self.load_model()
@@ -156,12 +175,9 @@ class EmbeddingManager:
         test_embedding = self.encode_single("test")
         return len(test_embedding)
 
-    def compare_embeddings(self,
-                           embedding1: np.ndarray,
-                           embedding2: np.ndarray,
-                           metric: str = "cosine") -> np.ndarray:
+    def compare_embeddings(self, embedding1: np.ndarray, embedding2: np.ndarray, metric: str = "cosine") -> np.ndarray:
         """
-        Compares two embeddings
+        Compares two embeddings.
 
         Args:
             embedding1: embedding
@@ -191,26 +207,20 @@ class EmbeddingManager:
         return similarity
 
     def chroma_embedding_function(self):
-        """
-        Returns a class instance compatible with ChromaDB
-        """
+        """Returns a class instance compatible with ChromaDB."""
         return ChromaEmbeddingAdapter(self)
 
+
 class ChromaEmbeddingAdapter(EmbeddingFunction):
-    def __init__(self, manager: 'EmbeddingManager'):
+    """
+    Adapter class to wrap an EmbeddingManager and provide a standard embedding function interface.
+    """
+
+    def __init__(self, manager: "EmbeddingManager"):
+        """Adapter for embedding functions that wraps an EmbeddingManager instance."""
         self.manager = manager
 
     def __call__(self, input: Documents) -> Embeddings:
-        embeddings = self.manager.encode(
-            list(input),
-            show_progress_bar=False
-        )
+        """Generate embeddings for a list of documents."""
+        embeddings = self.manager.encode(list(input), show_progress_bar=False)
         return embeddings.tolist()
-
-class EmbeddingBenchmark:
-
-    def benchmarkmodel(self):
-        pass
-
-    def quality_evaluation(self):
-        pass

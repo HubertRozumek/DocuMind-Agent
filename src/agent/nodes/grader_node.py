@@ -1,275 +1,167 @@
 import logging
-from typing import Dict, Any, List, Optional, Callable
+from typing import Any, Callable, Dict, List, Optional
+
 from langchain_core.runnables import RunnableLambda
 
 from src.agent.graph_state import GraphState, StateManager
-from src.agent.nodes.grader_model import BaseGraderModel, GraderFactory, HybridGrader
-from src.agent.nodes.grader_prompts import PromptFactory, GradingStrategy
-from src.agent.nodes.grader_fallback import FallbackManager
+from src.agent.nodes.robust_grader import RobustGrader
 
 logger = logging.getLogger(__name__)
 
 
 class GraderNode:
     """
-    Node that assesses document relevance to the user's question.
-    Integrates LLM grading with fallback strategies.
+    Document relevance grading node for RAG-based systems.
+
+    Evaluates document relevance to user queries using a multi-layer grading
+    strategy with confidence scoring and fallback mechanisms.
+
+    Attributes:
+        confidence_threshold: Minimum confidence score for relevance classification
+        model_name: Name of the LLM model used for grading
+        grader: Configured RobustGrader instance
     """
 
     def __init__(
-            self,
-            grader_type: str = "hybrid",
-            grading_strategy: GradingStrategy = GradingStrategy.CONFIDENCE,
-            use_fallback: bool = True,
-            confidence_threshold: float = 0.6,
-            **kwargs
+        self,
+        grader_type: str = "robust",
+        confidence_threshold: float = 0.7,
+        model_name: str = "phi3:mini",
+        **kwargs,
     ):
         """
-        Initialize the grader node.
+        Initialize the grader node with grading configuration.
 
         Args:
-            grader_type: Type of grader to use ('ollama', 'transformers', 'llama_cpp', 'mock', 'hybrid')
-            grading_strategy: Strategy for grading (binary, confidence, multi_criteria, reasoning)
-            use_fallback: Whether to use fallback strategies
-            confidence_threshold: Threshold for considering a document relevant
-            **kwargs: Additional configuration for the grader
+            grader_type: Type of grader to use (only 'robust' is supported)
+            confidence_threshold: Minimum confidence score (0.0-1.0) for relevance
+            model_name: Name of the Ollama model for grading
+            **kwargs: Additional configuration parameters (ignored, for compatibility)
+
+        Raises:
+            No explicit exceptions, falls back to 'robust' grader for unsupported types
         """
-        self.grader_type = grader_type
-        self.grading_strategy = grading_strategy
-        self.use_fallback = use_fallback
         self.confidence_threshold = confidence_threshold
-        self.config = kwargs
+        self.model_name = model_name
 
-        self.grader = self._initialize_grader()
+        if grader_type != "robust":
+            logger.warning(f"Grader type '{grader_type}' not supported, using 'robust'")
 
-        self.fallback_manager = FallbackManager() if use_fallback else None
+        self.grader = RobustGrader(model_name=model_name)
 
-        self.prompt_factory = PromptFactory()
+        logger.info(f"Initialized GraderNode with type=robust, threshold={confidence_threshold}")
 
-        logger.info(f"Initialized GraderNode with type={grader_type}, strategy={grading_strategy}")
-
-    def _initialize_grader(self) -> BaseGraderModel:
-        """
-        Initialize the grader model based on configuration.
-        """
-        try:
-            if self.grader_type == "hybrid":
-                return HybridGrader(**self.config)
-            else:
-                return GraderFactory.create_grader(self.grader_type, **self.config)
-        except Exception as e:
-            logger.error(f"Failed to initialize grader {self.grader_type}: {e}")
-            logger.warning("Falling back to mock grader")
-            return GraderFactory.create_grader("mock", **self.config)
-
-    def _create_grading_prompt(
-            self,
-            question: str,
-            document: str,
-            metadata: Optional[Dict[str, Any]] = None
-    ) -> str:
-        """
-        Create a prompt for grading based on the selected strategy.
-
-        Args:
-            question: User question
-            document: Document text to evaluate
-            metadata: Optional document metadata
-
-        Returns:
-            Formatted prompt for the grader
-        """
-        if self.grading_strategy == GradingStrategy.BINARY:
-            prompt_template = self.prompt_factory.create_binary_grading_prompt()
-        elif self.grading_strategy == GradingStrategy.CONFIDENCE:
-            prompt_template = self.prompt_factory.create_confidence_grading_prompt()
-        elif self.grading_strategy == GradingStrategy.MULTI_CRITERIA:
-            prompt_template = self.prompt_factory.create_multi_criteria_prompt()
-        elif self.grading_strategy == GradingStrategy.REASONING:
-            prompt_template = self.prompt_factory.create_reasoning_prompt()
-        else:
-            prompt_template = self.prompt_factory.create_binary_grading_prompt()
-
-        prompt = prompt_template.user_template.format(
-            question=question,
-            document=document,
-            metadata=metadata or {}
-        )
-
-        if hasattr(self.grader, 'needs_system_prompt') and self.grader.needs_system_prompt:
-            full_prompt = f"{prompt_template.system_template}\n\n{prompt}"
-        else:
-            full_prompt = prompt
-
-        return full_prompt
-
-    def grade_document(
-            self,
-            question: str,
-            document: str,
-            metadata: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+    def grade_document(self, question: str, document: str, metadata: Optional[Dict] = None) -> Dict[str, Any]:
         """
         Grade a single document for relevance to the question.
 
         Args:
-            question: User question
-            document: Document text to evaluate
-            metadata: Optional document metadata
+            question: User query to evaluate against
+            document: Document content to grade
+            metadata: Optional document metadata (API compatibility, not used by RobustGrader)
 
         Returns:
-            Dictionary with grading results
+            Dictionary containing grading results with confidence scores
         """
-        try:
-            prompt = self._create_grading_prompt(question, document, metadata)
+        result = self.grader.grade(question, document, metadata)
+        return result.to_dict()
 
-            llm_response = self.grader.grade(prompt)
-
-            parsed_result = self.grader.validate_response(
-                llm_response,
-                expected_format="JSON" if self.grading_strategy != GradingStrategy.BINARY else "YES/NO"
-            )
-
-            if (
-                    self.fallback_manager
-                    and parsed_result.get("confidence", 0) < self.confidence_threshold * 0.7
-            ):
-                fallback_result = self.fallback_manager.execute_fallback(
-                    question=question,
-                    document=document,
-                    metadata=metadata,
-                    llm_grade=parsed_result
-                )
-
-                if fallback_result["fallback_used"]:
-                    logger.info(f"Used fallback: {fallback_result.get('fallback_method')}")
-                    parsed_result.update(fallback_result)
-
-            if "confidence" not in parsed_result:
-                parsed_result["confidence"] = 0.5
-
-            is_relevant = parsed_result.get("relevant", False)
-            confidence = parsed_result.get("confidence", 0.0)
-
-            parsed_result["is_relevant"] = is_relevant and confidence >= self.confidence_threshold
-            parsed_result["final_confidence"] = confidence
-
-            return parsed_result
-
-        except Exception as e:
-            logger.error(f"Error grading document: {e}")
-
-            from src.agent.nodes.grader_fallback import KeywordFallbackGrader
-            keyword_grader = KeywordFallbackGrader(min_keyword_match=1)
-            fallback_result = keyword_grader.grade(question, document, metadata)
-
-            return {
-                "relevant": fallback_result.relevant,
-                "confidence": fallback_result.confidence,
-                "reason": f"Error occurred, used keyword fallback: {str(e)}",
-                "is_relevant": fallback_result.relevant and fallback_result.confidence >= 0.5,
-                "final_confidence": fallback_result.confidence,
-                "fallback_used": True,
-                "error": str(e)
-            }
-
-    def grade_documents(
-            self,
-            question: str,
-            documents: List[str],
-            metadatas: Optional[List[Dict[str, Any]]] = None
-    ) -> Dict[str, Any]:
+    def grade_documents(self, question: str, documents: List[str], metadatas: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         """
-        Grade multiple documents for relevance.
+        Grade multiple documents and aggregate results.
+
+        Processes documents in batch, calculates relevance metrics, and returns
+        aggregated statistics including average confidence and relevance ratio.
 
         Args:
-            question: User question
-            documents: List of document texts
-            metadatas: Optional list of metadata dictionaries
+            question: User query to evaluate documents against
+            documents: List of document strings to grade
+            metadatas: Optional list of metadata dictionaries (API compatibility)
 
         Returns:
-            Dictionary with grading results for all documents
+            Dictionary containing:
+                - individual_results: List of per-document grading results
+                - relevant_documents: List of documents passing threshold
+                - relevant_count: Number of relevant documents
+                - total_count: Total documents graded
+                - avg_confidence: Mean confidence across all documents
+                - relevance_ratio: Proportion of relevant documents (0.0-1.0)
+                - is_any_relevant: Boolean indicating if any document passed
         """
-        if metadatas is None:
-            metadatas = [{} for _ in documents]
+        logger.info(f"[grade_documents] Starting with {len(documents)} documents")
 
-        results = []
+        results = self.grader.grade_batch(question, documents)
+
         relevant_docs = []
+        individual_results = []
 
-        for i, (doc, metadata) in enumerate(zip(documents, metadatas)):
-            try:
-                result = self.grade_document(question, doc, metadata)
-                result["document_index"] = i
-                result["document_preview"] = doc[:200] + "..." if len(doc) > 200 else doc
+        for i, (doc, result) in enumerate(zip(documents, results)):
+            result_dict = result.to_dict()
+            logger.info(f"Doc {i}: LLM_conf={result_dict.get('llm_confidence', 'N/A')}, " f"final_conf={result.confidence}, method={result.method}")
+            result_dict["document_index"] = i
 
-                results.append(result)
+            doc_preview = doc[:200] + "..." if len(doc) > 200 else doc
+            result_dict["document_preview"] = doc_preview
 
-                if result.get("is_relevant", False):
-                    relevant_docs.append(doc)
+            individual_results.append(result_dict)
 
-            except Exception as e:
-                logger.error(f"Error grading document {i}: {e}")
-                results.append({
-                    "document_index": i,
-                    "relevant": False,
-                    "confidence": 0.0,
-                    "reason": f"Error during grading: {str(e)}",
-                    "is_relevant": False,
-                    "error": str(e)
-                })
+            if result.is_relevant(self.confidence_threshold):
+                relevant_docs.append(doc)
+                logger.debug(f"Doc {i}: RELEVANT (confidence={result.confidence:.2f}, score={result.score.name})")
+            else:
+                logger.debug(f"Doc {i}: NOT RELEVANT (confidence={result.confidence:.2f}, score={result.score.name})")
 
-        if results:
-            confidences = [r.get("confidence", 0.0) for r in results]
-            relevant_count = len([r for r in results if r.get("is_relevant", False)])
+        confidences = [r.confidence for r in results]
+        avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
 
-            overall_result = {
-                "individual_results": results,
-                "relevant_documents": relevant_docs,
-                "relevant_count": relevant_count,
-                "total_count": len(documents),
-                "avg_confidence": sum(confidences) / len(confidences) if confidences else 0.0,
-                "relevance_ratio": relevant_count / len(documents) if documents else 0.0,
-                "is_any_relevant": relevant_count > 0
-            }
-        else:
-            overall_result = {
-                "individual_results": [],
-                "relevant_documents": [],
-                "relevant_count": 0,
-                "total_count": 0,
-                "avg_confidence": 0.0,
-                "relevance_ratio": 0.0,
-                "is_any_relevant": False
-            }
+        relevance_ratio = len(relevant_docs) / len(documents) if documents else 0.0
 
-        return overall_result
+        result_dict = {
+            "individual_results": individual_results,
+            "relevant_documents": relevant_docs,
+            "relevant_count": len(relevant_docs),
+            "total_count": len(documents),
+            "avg_confidence": float(avg_confidence),
+            "relevance_ratio": float(relevance_ratio),
+            "is_any_relevant": len(relevant_docs) > 0,
+        }
+
+        logger.info(f"[grade_documents] Graded {len(documents)} docs, {len(relevant_docs)} relevant, " f"avg_confidence={avg_confidence:.2f}")
+
+        for i, (doc, result) in enumerate(zip(documents, results)):
+            is_rel = result.is_relevant(self.confidence_threshold)
+            logger.info(
+                f"Doc {i}: score={result.score.name}, conf={result.confidence:.2f}, is_relevant={is_rel}, threshold={self.confidence_threshold}"
+            )
+        return result_dict
 
     def as_runnable(self) -> Callable:
         """
-        Convert the grader to a LangGraph compatible runnable.
+        Convert to LangGraph-compatible runnable function.
 
         Returns:
-            Function that takes a state and returns updated state
+            RunnableLambda wrapping the grader function for LangGraph integration
         """
 
         def grader_function(state: GraphState) -> GraphState:
             """
-            Grader function for LangGraph.
+            LangGraph-compatible grader node function.
 
             Args:
-                state: Current graph state
+                state: Current graph state containing documents and iteration info
 
             Returns:
-                Updated state with grading results
+                Updated state with grading results, relevant documents, and routing flags
             """
-            logger.info(f"[Grader Function] Iteration {state['iterations']}")
+            logger.info(f"[Grader Function] Iteration {state.get('iterations', 0)}")
             logger.info(f"[Grader Function] Grading {len(state.get('documents', []))} documents")
 
             documents = state.get("documents", [])
 
             if not documents:
                 logger.warning("No documents to grade")
-                should_rewrite = (state["iterations"] < state["max_iterations"])
+                should_rewrite = state["iterations"] < state["max_iterations"]
+
                 return StateManager.update_state(
                     state,
                     relevant_docs=[],
@@ -280,30 +172,34 @@ class GraderNode:
                         **state.get("metadata", {}),
                         "grading_result": {
                             "error": "No documents to grade",
-                            "relevant_count": 0
-                        }
-                    }
+                            "relevant_count": 0,
+                            "total_count": 0,
+                            "relevance_ratio": 0.0,
+                            "is_any_relevant": False,
+                        },
+                    },
                 )
 
-            metadatas = state.get("metadata", {}).get("retrieval_results", {}).get("metadatas", [])
+            retrieval_results = state.get("metadata", {}).get("retrieval_results", {})
+            metadatas = retrieval_results.get("metadatas", [])
 
             grading_result = self.grade_documents(
                 question=state["question"],
                 documents=documents,
-                metadatas=metadatas[:len(documents)] if metadatas else None
+                metadatas=metadatas[: len(documents)] if metadatas else None,
             )
 
-            needs_rewrite = (
-                    not grading_result["is_any_relevant"] and
-                    state["iterations"] < state["max_iterations"]
-            )
+            is_any_relevant = grading_result["is_any_relevant"]
 
-            relevant = [
-                r.get("final_confidence", 0.0)
-                for r in grading_result["individual_results"]
-                if r.get("is_relevant")
-            ]
-            confidence = max(relevant) if relevant else grading_result["avg_confidence"]
+            needs_rewrite = not is_any_relevant and state["iterations"] < state["max_iterations"]
+
+            relevant_confidences = [r["confidence"] for r in grading_result["individual_results"] if r.get("relevant", False)]
+            logger.info(f"[Grader Function] Relevant docs found: {len(relevant_confidences)}")
+            if relevant_confidences:
+                confidence = float(max(relevant_confidences))
+                logger.info(f"[Grader Function] Confidences: {relevant_confidences}")
+            else:
+                confidence = float(grading_result["avg_confidence"])
 
             updated_state = StateManager.update_state(
                 state,
@@ -314,8 +210,8 @@ class GraderNode:
                 metadata={
                     **state.get("metadata", {}),
                     "grading_result": grading_result,
-                    "current_iteration": state["iterations"]
-                }
+                    "current_iteration": state["iterations"],
+                },
             )
 
             history_entry = {
@@ -327,14 +223,14 @@ class GraderNode:
                     "relevant_count": grading_result["relevant_count"],
                     "total_count": grading_result["total_count"],
                     "needs_rewrite": needs_rewrite,
-                    "relevance_ratio": grading_result["relevance_ratio"]
-                }
+                    "relevance_ratio": grading_result["relevance_ratio"],
+                },
             }
 
             updated_state = StateManager.add_to_history(updated_state, history_entry)
 
             logger.info(f"[Grader Function] Found {grading_result['relevant_count']} relevant documents")
-            logger.info(f"[Grader Function] Needs rewrite: {needs_rewrite}")
+            logger.info(f"[Grader Function] Confidence: {confidence:.2f}, Needs rewrite: {needs_rewrite}")
 
             return updated_state
 
@@ -343,13 +239,16 @@ class GraderNode:
 
 def grader_node(state: GraphState) -> GraphState:
     """
-    Node function for document grading.
+    Standalone grader node function for LangGraph.
+
+    Factory function that creates a GraderNode instance and executes
+    the grading pipeline. Suitable for direct use in LangGraph graphs.
 
     Args:
-        state: Current graph state
+        state: Current graph state with documents and question
 
     Returns:
-        Updated state
+        Updated state containing grading results and routing decisions
     """
     grader = GraderNode()
     return grader.as_runnable().invoke(state)

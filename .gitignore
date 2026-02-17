@@ -1,16 +1,172 @@
+# ============================================
+# DocuMind-Agent .gitignore
+# ============================================
+
+# ============================================
 # Python
+# ============================================
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ============================================
+# Virtual Environments
+# ============================================
+env/
 venv/
-.env
+ENV/
+env.bak/
+venv.bak/
+.venv/
 
-# Jupyter Notebook
+# ============================================
+# IDEs
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# ============================================
+# Testing
+# ============================================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+*.cover
+*.log
+.cache
+nosetests.xml
+coverage.xml
+*.coveragerc
+
+# ============================================
+# Type Checking
+# ============================================
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# ============================================
+# Documentation
+# ============================================
+docs/_build/
+site/
+.mkdocs_cache/
+
+# ============================================
+# Jupyter Notebooks
+# ============================================
 .ipynb_checkpoints
+*.ipynb
 
-# data
-data/
-models/*.pkl
-models/*.onnx
+# ============================================
+# Environment Variables
+# ============================================
+.env
+.env.local
+.env.*.local
+.envrc
 
+# ============================================
+# Data & Models
+# ============================================
+data/vector_store/
+models/cache/
+*.pdf
+*.docx
+*.txt
+*.csv
+*.json
+!tests/**/*.json
+!examples/**/*.pdf
+
+# ============================================
+# Logs
+# ============================================
+logs/
+*.log
+
+# ============================================
+# OS
+# ============================================
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ============================================
+# Docker
+# ============================================
+docker-compose.override.yml
+
+# ============================================
+# Temporary Files
+# ============================================
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+
+# ============================================
+# Package Managers
+# ============================================
+poetry.lock
+Pipfile.lock
+
+# ============================================
+# ChromaDB
+# ============================================
+chroma.sqlite3
+chroma.sqlite3-shm
+chroma.sqlite3-wal
+
+# ============================================
+# Streamlit
+# ============================================
+.streamlit/secrets.toml
+
+# ============================================
+# Project Specific
+# ============================================
+# Keep example data
+!examples/
+!examples/**
